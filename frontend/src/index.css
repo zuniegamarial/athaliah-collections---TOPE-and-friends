@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Visible focus indicator (WCAG 2.4.7) */
+*:focus-visible {
+  outline: 3px solid #e11d55;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+html, body, #root { height: 100%; }
+body { font-family: system-ui, -apple-system, sans-serif; }
