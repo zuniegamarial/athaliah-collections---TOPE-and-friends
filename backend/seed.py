@@ -5,7 +5,6 @@ def seed():
     conn = get_db()
     cur = conn.cursor()
 
-    # Only seed if empty
     cur.execute("SELECT COUNT(*) AS c FROM users")
     if cur.fetchone()["c"] > 0:
         print("Database already seeded.")
@@ -28,9 +27,8 @@ def seed():
     ]
     cur.executemany("INSERT INTO categories (name, description) VALUES (?, ?)", categories)
 
-    # Products (demo data — prices are PROTOTYPE values)
+    # Products (DEMO data)
     products = [
-        # name, sku, desc, price, stock, safety, cat_id, img, alt, status
         ("Classic Sneakers", "SNK-001", "Classic white sneakers", 1299.00, 12, 5, 1,
          "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400",
          "White classic athletic sneaker with laces", "Active"),
@@ -41,7 +39,7 @@ def seed():
          "https://images.unsplash.com/photo-1600269452121-4f2416e55c28?w=400",
          "Bright pink sneakers with white soles", "Out of Stock"),
         ("Athaliah Gel Tint", "COS-001", "Long-lasting gel tint", 299.00, 8, 5, 2,
-         "https://images.unsplash.com/photo-1631214540553-ff5b1b4b3d5c?w=400",
+         "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=400",
          "Athaliah Gel Tint collection in multiple shades", "Active"),
         ("Victoria's Secret Mist 250ml", "FRG-001", "Body mist 250ml", 899.00, 4, 5, 3,
          "https://images.unsplash.com/photo-1541643600914-78b084683601?w=400",
@@ -64,27 +62,19 @@ def seed():
 
     # Variants
     variants = [
-        # Sneaker 1: sizes 7-9.5 (White only)
         (1, "White / Size 7",   "SNK-001-WHT-7",   1299, 5, "7",   "White", None, None),
         (1, "White / Size 8",   "SNK-001-WHT-8",   1299, 4, "8",   "White", None, None),
         (1, "White / Size 9",   "SNK-001-WHT-9",   1299, 3, "9",   "White", None, None),
-        # Sneaker 2: Black variants
         (2, "Black / Size 8",   "SNK-002-BLK-8",   1499, 3, "8",   "Black", None, None),
         (2, "Black / Size 8.5", "SNK-002-BLK-85",  1499, 0, "8.5", "Black", None, None),
-        # Sneaker 3: colored (out of stock)
         (3, "Pink / Size 8",    "SNK-003-PNK-8",   1599, 0, "8",   "Pink",  None, None),
-        # Gel Tint shades
         (4, "Red Shade",  "COS-001-RED",  299, 3, None, None, "Red",  None),
         (4, "Nude Shade", "COS-001-NUD",  299, 3, None, None, "Nude", None),
         (4, "Pink Shade", "COS-001-PNK",  299, 2, None, None, "Pink", None),
-        # Mist 250ml scents
         (5, "Love Spell 250ml", "FRG-001-LS",  899, 4, "250ml", None, None, "Love Spell"),
         (5, "Pure Seduction 250ml", "FRG-001-PS", 899, 0, "250ml", None, None, "Pure Seduction"),
-        # Mist 75ml
         (6, "Love Spell 75ml", "FRG-002-LS",  499, 15, "75ml", None, None, "Love Spell"),
-        # Fragrances
         (7, "Bombshell 100ml", "FRG-003-BMB", 1899, 6, "100ml", None, None, "Bombshell"),
-        # Earrings
         (8, "Gold Star",  "ACC-001-GS", 199, 15, None, None, None, None),
         (8, "Silver Moon", "ACC-001-SM", 199, 10, None, None, None, None),
     ]
@@ -94,7 +84,7 @@ def seed():
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, variants)
 
-    # Customers (inclusive fields)
+    # Customers
     customers = [
         ("Juan Dela Cruz", "Juan", "Mr.", "Man",
          "juan@example.com", "09171234567", "Legazpi City, Albay"),
@@ -110,7 +100,7 @@ def seed():
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, customers)
 
-    # Orders (3 sample orders per spec)
+    # Orders
     orders = [
         ("#1001", 1, "2026-01-15", 1299.00, "Paid",   "Pending",    None),
         ("#1002", 2, "2026-01-16", 1299.00, "Paid",   "Processing", None),
@@ -123,7 +113,6 @@ def seed():
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, orders)
 
-    # Order items
     items = [
         (1, 1, 1, "Classic Sneakers", "White / Size 7", 1, 1299.00),
         (2, 1, 2, "Classic Sneakers", "White / Size 8", 1, 1299.00),

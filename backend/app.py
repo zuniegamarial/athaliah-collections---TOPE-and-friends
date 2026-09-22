@@ -12,9 +12,19 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
 )
 
-CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
+CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
 
 DEMO_OTP = "123456"
+
+# ---------- HELPERS ----------
+def clean_category_id(value):
+    """Convert '', None, 'null' to None; otherwise coerce to int."""
+    if value in ("", None, "null"):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 # ---------- AUTH ----------
 def login_required(f):
@@ -86,7 +96,6 @@ def dashboard():
         "SELECT COUNT(*) c FROM orders WHERE order_status = 'Pending'"
     ).fetchone()["c"]
 
-    # Low stock = variants OR products where stock <= safety_stock AND stock > 0
     low_stock_variants = conn.execute("""
         SELECT pv.id, p.name AS product_name, pv.variant_name, pv.sku,
                pv.stock, p.safety_stock, p.image_alt
@@ -217,6 +226,8 @@ def create_product():
         return jsonify({"errors": errors}), 400
 
     status = data.get("status") or ("Out of Stock" if clean["stock"] == 0 else "Active")
+    category_id = clean_category_id(data.get("category_id"))
+
     cur = conn.execute("""
         INSERT INTO products (name, sku, description, price, stock, safety_stock,
                               category_id, image_url, image_alt, status)
@@ -224,7 +235,7 @@ def create_product():
     """, (
         clean["name"], clean["sku"], data.get("description", ""),
         clean["price"], clean["stock"], clean["safety_stock"],
-        data.get("category_id"), data.get("image_url", ""),
+        category_id, data.get("image_url", ""),
         data.get("image_alt", ""), status
     ))
     pid = cur.lastrowid
@@ -261,6 +272,8 @@ def update_product(pid):
         return jsonify({"errors": errors}), 400
 
     status = data.get("status") or ("Out of Stock" if clean["stock"] == 0 else "Active")
+    category_id = clean_category_id(data.get("category_id"))
+
     conn.execute("""
         UPDATE products SET name=?, sku=?, description=?, price=?, stock=?,
                             safety_stock=?, category_id=?, image_url=?,
@@ -269,7 +282,7 @@ def update_product(pid):
     """, (
         clean["name"], clean["sku"], data.get("description", ""),
         clean["price"], clean["stock"], clean["safety_stock"],
-        data.get("category_id"), data.get("image_url", ""),
+        category_id, data.get("image_url", ""),
         data.get("image_alt", ""), status, pid
     ))
     conn.commit()
@@ -334,7 +347,6 @@ def update_inventory(vid):
     conn = get_db()
     table = "product_variants" if kind == "variant" else "products"
     conn.execute(f"UPDATE {table} SET stock = ? WHERE id = ?", (new_stock, vid))
-    # Update product status if product row
     if kind == "product":
         conn.execute("""
             UPDATE products SET status = CASE
