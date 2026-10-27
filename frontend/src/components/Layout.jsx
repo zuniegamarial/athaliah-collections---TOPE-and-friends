@@ -73,7 +73,6 @@ export default function Layout() {
       className="flex min-h-screen text-[#292725]"
       style={{ backgroundColor }}
     >
-      {/* Sidebar */}
       <aside
         className="flex w-64 flex-col border-r"
         style={{
@@ -98,7 +97,6 @@ export default function Layout() {
           </p>
         </header>
 
-        {/* Navigation */}
         <nav aria-label="Main navigation" className="flex-1 p-3">
           <p
             className="mb-3 px-3 pt-3 text-[10px] font-semibold tracking-[0.2em]"
@@ -131,7 +129,6 @@ export default function Layout() {
           </ul>
         </nav>
 
-        {/* Logout */}
         <div
           className="border-t p-3"
           style={{ borderColor: accentColor }}
@@ -147,10 +144,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <div className="flex min-w-0 flex-1 flex-col">
-
-        {/* Top Header */}
         <header
           className="flex items-center justify-between border-b px-6 py-4 transition-colors duration-300"
           style={{
@@ -173,14 +167,12 @@ export default function Layout() {
           </span>
         </header>
 
-        {/* Page Content */}
         <main
           className="flex-1 p-6 transition-colors duration-300"
           style={{ backgroundColor }}
         >
           <Outlet />
         </main>
-
       </div>
     </div>
   )

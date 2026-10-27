@@ -1,4 +1,6 @@
+
 import { Routes, Route, Navigate } from 'react-router-dom'
+
 import Login from './pages/Login'
 import LandingPage from './pages/LandingPage'
 import MFA from './pages/MFA'
@@ -9,9 +11,9 @@ import Inventory from './pages/Inventory'
 import Orders from './pages/Orders'
 import OrderDetails from './pages/OrderDetails'
 import Customers from './pages/Customers'
-import Layout from './components/Layout'
 import Categories from './pages/Categories'
 import Settings from './pages/Settings'
+import Layout from './components/Layout'
 
 export default function App() {
   return (
@@ -20,8 +22,8 @@ export default function App() {
       <Route path="/settings" element={<Settings />} />
       <Route path="/login" element={<Login />} />
       <Route path="/mfa" element={<MFA />} />
+
       <Route element={<Layout />}>
-        <Route path="/categories" element={<Categories />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductDetails />} />
@@ -29,7 +31,9 @@ export default function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/orders/:id" element={<OrderDetails />} />
         <Route path="/customers" element={<Customers />} />
+        <Route path="/categories" element={<Categories />} />
       </Route>
+
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )

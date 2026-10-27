@@ -1,3 +1,4 @@
+
 import sqlite3
 import os
 
@@ -24,15 +25,13 @@ def init_db():
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    
-CREATE TABLE IF NOT EXISTS user_preferences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE NOT NULL,
-    background_color TEXT NOT NULL DEFAULT '#f7f5f0',
-    accent_color TEXT NOT NULL DEFAULT '#a18b69',
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
+    CREATE TABLE IF NOT EXISTS user_preferences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE NOT NULL,
+        background_color TEXT NOT NULL DEFAULT '#f7f5f0',
+        accent_color TEXT NOT NULL DEFAULT '#a18b69',
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
 
     CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

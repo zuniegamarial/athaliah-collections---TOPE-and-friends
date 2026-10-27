@@ -1,3 +1,4 @@
+
 const BASE = '';
 
 async function request(path, options = {}) {
@@ -6,14 +7,17 @@ async function request(path, options = {}) {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
+
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
+
   if (!res.ok) {
     const err = new Error(data.error || 'Request failed');
     err.data = data;
     err.status = res.status;
     throw err;
   }
+
   return data;
 }
 
@@ -37,36 +41,35 @@ export const api = {
   orders: () => request('/api/orders'),
   order: (id) => request(`/api/orders/${id}`),
   updateOrderStatus: (id, status) => request(`/api/orders/${id}/status`, {
-    method: 'PUT', body: JSON.stringify({ status }),
+    method: 'PUT',
+    body: JSON.stringify({ status }),
   }),
   addTracking: (id, tracking_number) => request(`/api/orders/${id}/tracking`, {
-    method: 'POST', body: JSON.stringify({ tracking_number }),
+    method: 'POST',
+    body: JSON.stringify({ tracking_number }),
   }),
   shippingLabel: (id) => request(`/api/orders/${id}/shipping-label`, { method: 'POST' }),
   refundOrder: (id) => request(`/api/orders/${id}/refund`, { method: 'POST' }),
 
   customers: () => request('/api/customers'),
   createCustomer: (b) => request('/api/customers', { method: 'POST', body: JSON.stringify(b) }),
+
   categories: () => request('/api/categories'),
+  createCategory: (b) => request('/api/categories', {
+    method: 'POST',
+    body: JSON.stringify(b),
+  }),
+  updateCategory: (id, b) => request(`/api/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(b),
+  }),
+  deleteCategory: (id) => request(`/api/categories/${id}`, {
+    method: 'DELETE',
+  }),
 
-createCategory: (b) => request('/api/categories', {
-  method: 'POST',
-  body: JSON.stringify(b),
-}),
-
-updateCategory: (id, b) => request(`/api/categories/${id}`, {
-  method: 'PUT',
-  body: JSON.stringify(b),
-}),
-
-deleteCategory: (id) => request(`/api/categories/${id}`, {
-  method: 'DELETE',
-}),
-
-preferences: () => request('/api/preferences'),
-
-updatePreferences: (b) => request('/api/preferences', {
-  method: 'PUT',
-  body: JSON.stringify(b),
-}),
+  preferences: () => request('/api/preferences'),
+  updatePreferences: (b) => request('/api/preferences', {
+    method: 'PUT',
+    body: JSON.stringify(b),
+  }),
 };
