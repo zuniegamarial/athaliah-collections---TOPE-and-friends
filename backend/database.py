@@ -1,4 +1,3 @@
-
 import sqlite3
 import os
 
@@ -14,7 +13,7 @@ def get_db():
 def init_db():
     conn = get_db()
     cur = conn.cursor()
-
+    
     cur.executescript("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,14 +82,15 @@ def init_db():
     CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_number TEXT UNIQUE NOT NULL,
-        customer_id INTEGER NOT NULL,
+        customer_id INTEGER,
         order_date TEXT DEFAULT CURRENT_TIMESTAMP,
         total REAL NOT NULL,
         payment_status TEXT NOT NULL DEFAULT 'Paid',
         order_status TEXT NOT NULL DEFAULT 'Pending',
         tracking_number TEXT,
         shipping_label_generated INTEGER DEFAULT 0,
-        FOREIGN KEY (customer_id) REFERENCES customers(id)
+        items TEXT,
+        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS order_items (
@@ -107,5 +107,14 @@ def init_db():
     );
     """)
 
+    # Seed a default Guest Customer (ID 1) to prevent customer_id constraint errors
+    cur.execute("""
+        INSERT OR IGNORE INTO customers (id, full_name, email, phone, address)
+        VALUES (1, 'Guest Customer', 'guest@athaliah.com', '09123456789', 'Legazpi City')
+    """)
+
     conn.commit()
     conn.close()
+
+if __name__ == "__main__":
+    init_db()
