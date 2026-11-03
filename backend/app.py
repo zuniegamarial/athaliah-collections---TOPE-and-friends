@@ -14,13 +14,12 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
 )
 
-CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"])
+CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.8.199:5173", "*"])
 
 DEMO_OTP = "123456"
 
 # ---------- HELPERS ----------
 def clean_category_id(value):
-    """Convert '', None, 'null' to None; otherwise coerce to int."""
     if value in ("", None, "null"):
         return None
     try:
@@ -40,19 +39,21 @@ def login_required(f):
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.json or {}
-    username = data.get('username')
-    email = data.get('email')
+    username = (data.get('username') or '').strip()
+    first_name = (data.get('first_name') or '').strip()
+    last_name = (data.get('last_name') or '').strip()
+    email = (data.get('email') or '').strip()
+    phone = (data.get('phone') or '').strip()
     password = data.get('password')
     
-    if not username or not email or not password:
+    if not username or not first_name or not last_name or not email or not password or not phone:
         return jsonify({"success": False, "message": "All fields are required"}), 400
     
     conn = get_db()
-    
     existing_user = conn.execute('SELECT * FROM users WHERE username = ? OR email = ?', (username, email)).fetchone()
     if existing_user:
         conn.close()
-        return jsonify({"success": False, "message": "Username or email already exists"}), 409
+        return jsonify({"success": False, "message": "Username or email already registered"}), 409
     
     hashed_password = generate_password_hash(password)
     try:
@@ -60,8 +61,14 @@ def register():
             'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
             (username, email, hashed_password, 'customer')
         )
+        full_name = f"{first_name} {last_name}"
+        conn.execute(
+            'INSERT INTO customers (first_name, last_name, full_name, email, phone, address) VALUES (?, ?, ?, ?, ?, ?)',
+            (first_name, last_name, full_name, email, phone, 'Not provided')
+        )
         conn.commit()
     except Exception as e:
+        conn.rollback()
         conn.close()
         return jsonify({"success": False, "message": str(e)}), 500
         
@@ -71,11 +78,11 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json or {}
-    username = data.get('username')
+    identifier = data.get('username')
     password = data.get('password')
     
     conn = get_db()
-    user = conn.execute('SELECT * FROM users WHERE username = ? OR email = ?', (username, username)).fetchone()
+    user = conn.execute('SELECT * FROM users WHERE username = ? OR email = ?', (identifier, identifier)).fetchone()
     conn.close()
     
     if user and check_password_hash(user['password_hash'], password):
@@ -92,7 +99,7 @@ def login():
             }
         }, 200
     
-    return {"success": False, "message": "Invalid username or password"}, 401
+    return {"success": False, "message": "Invalid username/email or password"}, 401
 
 @app.route("/api/mfa", methods=["POST"])
 def mfa():
@@ -112,7 +119,7 @@ def mfa():
 @app.route("/api/logout", methods=["POST"])
 def logout():
     session.clear()
-    return jsonify({"message": "Logged out."})
+    return jsonify({"message": "Logged out successfully."})
 
 @app.route("/api/me", methods=["GET"])
 def me():
@@ -211,7 +218,7 @@ def dashboard():
 
     recent_orders = conn.execute("""
         SELECT o.id, o.order_number, 
-               COALESCE(c.full_name, 'Mobile Customer') AS customer, 
+               COALESCE(c.full_name, 'Unlinked Account') AS customer, 
                o.total, o.order_status, o.payment_status
         FROM orders o 
         LEFT JOIN customers c ON c.id = o.customer_id
@@ -247,13 +254,6 @@ def list_products():
     conn.close()
     
     products = [dict(r) for r in rows]
-    if not products:
-        products = [
-            {"id": 1, "name": "Classic Sneakers", "price": 1299.00, "image_url": "https://via.placeholder.com/150"},
-            {"id": 2, "name": "Athaliah Signature Perfume", "price": 450.00, "image_url": "https://via.placeholder.com/150"},
-            {"id": 3, "name": "Elegant Handbag", "price": 899.00, "image_url": "https://via.placeholder.com/150"},
-            {"id": 4, "name": "Silver Necklace", "price": 299.00, "image_url": "https://via.placeholder.com/150"}
-        ]
     return jsonify(products)
 
 @app.route("/api/products/<int:pid>", methods=["GET"])
@@ -476,55 +476,120 @@ def handle_orders():
     if request.method == 'POST':
         data = request.get_json() or {}
         try:
-            customer_id = session.get("user_id", 1)
+            user_id = session.get("user_id")
+            if not user_id:
+                conn.close()
+                return jsonify({"success": False, "message": "Authentication required. Please log in to place an order."}), 401
+            
+            user_row = conn.execute("SELECT username, email FROM users WHERE id = ?", (user_id,)).fetchone()
+            if not user_row:
+                conn.close()
+                return jsonify({"success": False, "message": "User session invalid."}), 401
+
+            customer_id = None
+            cust_row = conn.execute("SELECT id FROM customers WHERE email = ?", (user_row['email'],)).fetchone()
+            if cust_row:
+                customer_id = cust_row['id']
+            else:
+                cust_row = conn.execute("SELECT id FROM customers WHERE full_name = ?", (user_row['username'],)).fetchone()
+                if cust_row:
+                    customer_id = cust_row['id']
+            
+            if not customer_id:
+                cursor.execute('''
+                    INSERT INTO customers (first_name, last_name, full_name, email, phone, address)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    user_row['username'], 
+                    'Customer', 
+                    user_row['username'], 
+                    user_row['email'], 
+                    data.get('contact_phone', '09123456789'), 
+                    data.get('shipping_address', 'Legazpi City')
+                ))
+                conn.commit()
+                customer_id = cursor.lastrowid
             
             cursor.execute('''
                 INSERT INTO orders (order_number, customer_id, total, payment_status, order_status, order_date)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
             ''', (
                 f"ATH-{os.urandom(2).hex().upper()}",
                 customer_id,
                 data.get('total', 0.0), 
-                data.get('payment_method', 'GCash'), 
-                'Pending',
-                'Oct 29, 2026'
+                data.get('payment_method', 'COD'), 
+                'Pending'
             ))
             order_id = cursor.lastrowid
             
-            # Save product link to order_items if provided
-            product_id = data.get('product_id')
-            if product_id:
+            items = data.get('items', [])
+            for item in items:
                 cursor.execute('''
-                    INSERT INTO order_items (order_id, product_id, quantity, price)
-                    VALUES (?, ?, ?, ?)
-                ''', (order_id, product_id, data.get('quantity', 1), data.get('total', 0.0)))
+                    INSERT INTO order_items (order_id, product_id, product_name, quantity, price)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    order_id,
+                    item.get('product_id'),
+                    item.get('product_name', item.get('name', 'Athaliah Collection Item')),
+                    item.get('quantity', 1),
+                    item.get('price', 0.0)
+                ))
 
             conn.commit()
             conn.close()
-            return jsonify({"message": "Order created successfully", "status": "success"}), 201
+            return jsonify({"message": "Order created successfully", "status": "success", "order_id": order_id}), 201
         except Exception as e:
+            conn.rollback()
             conn.close()
             return jsonify({"success": False, "message": str(e)}), 500
 
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # FIXED QUERY: Joins order_items and products to return correct product names & images
     cursor.execute("""
         SELECT o.id, o.order_number, 
-               COALESCE(c.full_name, 'Mobile Customer') AS customer,
+               COALESCE(c.full_name, 'Unlinked Account') AS customer,
                o.order_date, o.total, COALESCE(o.payment_status, 'Paid') AS payment_status, 
                COALESCE(o.order_status, 'Pending') AS order_status,
                o.tracking_number,
-               COALESCE(p.name, 'Athaliah Collection Item') AS product_name,
+               COALESCE(pi.product_name, p.name, 'Athaliah Collection Item') AS product_name,
                COALESCE(p.image_url, 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500') AS image_url
         FROM orders o 
         LEFT JOIN customers c ON c.id = o.customer_id
-        LEFT JOIN order_items oi ON oi.order_id = o.id
-        LEFT JOIN products p ON p.id = oi.product_id
+        LEFT JOIN order_items pi ON pi.order_id = o.id
+        LEFT JOIN products p ON p.id = pi.product_id
         ORDER BY o.id DESC
     """)
     rows = cursor.fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/store/orders", methods=["GET"])
+@login_required
+def store_my_orders():
+    conn = get_db()
+    user_id = session.get("user_id")
+    
+    user_row = conn.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
+    customer_id = None
+    if user_row:
+        cust_row = conn.execute("SELECT id FROM customers WHERE email = ?", (user_row['email'],)).fetchone()
+        if cust_row:
+            customer_id = cust_row['id']
+
+    # Fetch orders along with specific item name and image mapping
+    rows = conn.execute("""
+        SELECT DISTINCT o.id, o.order_number, o.order_date, o.total, 
+               o.payment_status, o.order_status, o.tracking_number,
+               COALESCE(pi.product_name, p.name, 'Athaliah Collection Item') AS product_name,
+               COALESCE(p.image_url, 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500') AS image_url
+        FROM orders o
+        LEFT JOIN order_items pi ON pi.order_id = o.id
+        LEFT JOIN products p ON p.id = pi.product_id
+        WHERE o.customer_id = ?
+        ORDER BY o.id DESC
+    """, (customer_id,)).fetchall()
+    
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -533,7 +598,7 @@ def handle_orders():
 def get_order(oid):
     conn = get_db()
     o = conn.execute("""
-        SELECT o.*, COALESCE(c.full_name, 'Mobile Customer') AS customer, 
+        SELECT o.*, COALESCE(c.full_name, 'Unlinked Account') AS customer, 
                c.email AS customer_email, c.phone AS customer_phone, c.address AS customer_address
         FROM orders o 
         LEFT JOIN customers c ON c.id = o.customer_id
@@ -551,7 +616,6 @@ def get_order(oid):
     return jsonify(data)
 
 @app.route("/api/orders/<int:oid>/status", methods=["PUT"])
-@login_required
 def update_order_status(oid):
     data = request.get_json() or {}
     status = data.get("status")
@@ -561,10 +625,10 @@ def update_order_status(oid):
     conn = get_db()
     conn.execute("UPDATE orders SET order_status = ? WHERE id = ?", (status, oid))
     if status in ("Refunded", "Returns", "Cancelled"):
-        conn.execute("UPDATE orders SET payment_status = 'Refunded' WHERE id = ?", (oid,))
+        conn.execute("UPDATE orders SET payment_status = 'Cancelled' WHERE id = ?", (oid,))
     conn.commit()
     conn.close()
-    return jsonify({"message": f"Order status updated to {status}."})
+    return jsonify({"message": f"Order status updated to {status}.", "status": "success"})
 
 @app.route("/api/orders/<int:oid>/return", methods=["POST"])
 def return_order(oid):
@@ -656,7 +720,6 @@ def create_customer():
 
 # ---------- CATEGORIES ----------
 @app.route("/api/categories", methods=["GET"])
-@login_required
 def list_categories():
     conn = get_db()
     rows = conn.execute("""

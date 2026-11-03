@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from werkzeug.security import generate_password_hash
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
 
@@ -11,6 +12,13 @@ def get_db():
     return conn
 
 def init_db():
+    # Force clean database reload to reset products
+    if os.path.exists(DB_PATH):
+        try:
+            os.remove(DB_PATH)
+        except Exception:
+            pass
+
     conn = get_db()
     cur = conn.cursor()
     
@@ -20,7 +28,7 @@ def init_db():
         username TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'admin',
+        role TEXT NOT NULL DEFAULT 'customer',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -70,6 +78,8 @@ def init_db():
 
     CREATE TABLE IF NOT EXISTS customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        first_name TEXT,
+        last_name TEXT,
         full_name TEXT NOT NULL,
         preferred_name TEXT,
         title TEXT,
@@ -107,10 +117,29 @@ def init_db():
     );
     """)
 
-    # Seed a default Guest Customer (ID 1) to prevent customer_id constraint errors
+    # Seed Admin Account
+    admin_pw = generate_password_hash("admin123")
     cur.execute("""
-        INSERT OR IGNORE INTO customers (id, full_name, email, phone, address)
-        VALUES (1, 'Guest Customer', 'guest@athaliah.com', '09123456789', 'Legazpi City')
+        INSERT OR IGNORE INTO users (id, username, email, password_hash, role)
+        VALUES (1, 'admin', 'admin@athaliah.com', ?, 'admin')
+    """, (admin_pw,))
+
+    cur.execute("""
+        INSERT OR IGNORE INTO customers (id, first_name, last_name, full_name, email, phone, address)
+        VALUES (1, 'Admin', 'User', 'Administrator', 'admin@athaliah.com', '09123456789', 'Legazpi City')
+    """)
+
+    # Seed Original Store Products Only
+    cur.executescript("""
+        INSERT OR IGNORE INTO products (id, name, sku, description, price, stock, safety_stock, image_url, status) VALUES
+        (1, 'Classic Sneakers', 'ATH-SNK-001', 'Comfortable everyday casual sneakers', 1299.00, 50, 5, 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500', 'Active'),
+        (2, 'Athaliah Signature Perfume', 'ATH-PRF-002', 'Long-lasting luxury fragrance', 450.00, 30, 5, 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=500', 'Active'),
+        (3, 'Elegant Handbag', 'ATH-BAG-003', 'Chic fashion accessory for any occasion', 899.00, 20, 5, 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500', 'Active'),
+        (4, 'Silver Necklace', 'ATH-ACC-004', 'Dainty sterling silver pendant necklace', 299.00, 40, 5, 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=500', 'Active'),
+        (5, 'Minimalist Watch', 'ATH-ACC-005', 'Classic leather strap timepiece', 1099.00, 15, 3, 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500', 'Active'),
+        (6, 'Silk Scarf', 'ATH-ACC-006', 'Soft premium patterned neck scarf', 350.00, 25, 5, 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=500', 'Active'),
+        (7, 'Scented Soy Candle', 'ATH-HOM-007', 'Relaxing vanilla and lavender aroma', 250.00, 60, 10, 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=500', 'Active'),
+        (8, 'Gold Hoop Earrings', 'ATH-ACC-008', 'Lightweight everyday statement earrings', 399.00, 35, 5, 'https://images.unsplash.com/photo-1630019852942-f89202989a59?w=500', 'Active');
     """)
 
     conn.commit()
@@ -118,3 +147,4 @@ def init_db():
 
 if __name__ == "__main__":
     init_db()
+    print("Database reset successfully to original products!")

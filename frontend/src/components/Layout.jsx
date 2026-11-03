@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -70,11 +69,12 @@ export default function Layout() {
 
   return (
     <div
-      className="flex min-h-screen text-[#292725]"
+      className="flex h-screen overflow-hidden text-[#292725]"
       style={{ backgroundColor }}
     >
+      {/* FIXED SIDEBAR: Sticks to the left and takes full viewport height */}
       <aside
-        className="flex w-64 flex-col border-r"
+        className="flex h-screen w-64 flex-col border-r sticky top-0 shrink-0"
         style={{
           backgroundColor: `${accentColor}20`,
           borderColor: accentColor,
@@ -97,7 +97,7 @@ export default function Layout() {
           </p>
         </header>
 
-        <nav aria-label="Main navigation" className="flex-1 p-3">
+        <nav aria-label="Main navigation" className="flex-1 overflow-y-auto p-3">
           <p
             className="mb-3 px-3 pt-3 text-[10px] font-semibold tracking-[0.2em]"
             style={{ color: accentColor }}
@@ -130,7 +130,7 @@ export default function Layout() {
         </nav>
 
         <div
-          className="border-t p-3"
+          className="border-t p-3 mt-auto"
           style={{ borderColor: accentColor }}
         >
           <button
@@ -144,9 +144,11 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* RIGHT CONTAINER: Top bar + Scrollable Content Area */}
+      <div className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
+        {/* FIXED TOP HEADER */}
         <header
-          className="flex items-center justify-between border-b px-6 py-4 transition-colors duration-300"
+          className="flex items-center justify-between border-b px-6 py-4 sticky top-0 z-10 shrink-0 transition-colors duration-300"
           style={{
             backgroundColor: `${accentColor}20`,
             borderColor: accentColor,
@@ -167,8 +169,9 @@ export default function Layout() {
           </span>
         </header>
 
+        {/* SCROLLABLE MAIN CONTENT AREA */}
         <main
-          className="flex-1 p-6 transition-colors duration-300"
+          className="flex-1 overflow-y-auto p-6 transition-colors duration-300"
           style={{ backgroundColor }}
         >
           <Outlet />

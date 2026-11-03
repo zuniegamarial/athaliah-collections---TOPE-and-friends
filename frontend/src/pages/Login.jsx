@@ -1,4 +1,3 @@
-
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Lock, User, ArrowLeft, ArrowRight } from 'lucide-react'
@@ -28,6 +27,10 @@ export default function Login() {
 
     try {
       await api.login({ username, password })
+      
+      // Save the pending user state for MFA verification
+      localStorage.setItem('pending_mfa_user', username)
+      
       nav('/mfa')
     } catch (err) {
       setError(err.data?.error || 'Login failed. Please try again.')
