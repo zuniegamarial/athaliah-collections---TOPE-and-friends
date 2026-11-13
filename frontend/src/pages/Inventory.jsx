@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react'
 import {
   Boxes, Search, Save, X, Package,
@@ -18,8 +17,9 @@ export default function Inventory() {
   const accent = 'var(--app-accent, #a18b69)'
 
   const panelStyle = {
-    backgroundColor: 'white',
-    borderColor: `${accent}66`,
+    backgroundColor: 'var(--panel-bg, white)',
+    color: 'var(--panel-text, #292725)',
+    borderColor: 'var(--panel-border, #ded8cd)',
   }
 
   const load = () => api.inventory().then(setItems).catch(() => {})
@@ -42,7 +42,7 @@ export default function Inventory() {
   })
 
   const startEdit = (it) => {
-    setEditing({ id: it.id, kind: it.kind, value: it.current_stock })
+    setEditing({ id: it.id, kind: it.kind, mode: 'add', value: '' })
   }
 
   const cancelEdit = () => setEditing(null)
@@ -51,22 +51,28 @@ export default function Inventory() {
     if (!editing) return
 
     const n = Number(editing.value)
+    const isAdd = editing.mode === 'add'
 
-    if (!Number.isInteger(n) || n < 0) {
+    if (editing.value === '' || !Number.isInteger(n) || (isAdd ? n < 1 : n < 0)) {
       setNotice({
         type: 'error',
-        message: 'Stock must be a non-negative whole number.',
+        message: isAdd
+          ? 'Enter a whole number of 1 or more to add.'
+          : 'Stock must be a non-negative whole number.',
       })
       return
     }
 
     try {
-      await api.updateInventory(editing.id, {
-        stock: n,
-        kind: editing.kind,
-      })
+      await api.updateInventory(
+        editing.id,
+        isAdd ? { add: n, kind: editing.kind } : { stock: n, kind: editing.kind }
+      )
 
-      setNotice({ type: 'success', message: 'Stock updated successfully.' })
+      setNotice({
+        type: 'success',
+        message: isAdd ? `Added ${n} to stock.` : 'Stock updated successfully.',
+      })
       setEditing(null)
       load()
     } catch (err) {
@@ -97,10 +103,10 @@ export default function Inventory() {
         <p className="text-xs font-medium uppercase tracking-[0.2em]" style={{ color: accent }}>
           Store Management
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-[#292725]">
+        <h1 className="mt-2 text-2xl font-semibold" style={{ color: 'var(--app-text, #292725)' }}>
           Inventory
         </h1>
-        <p className="mt-1 text-sm text-[#8B7663]">
+        <p className="mt-1 text-sm" style={{ color: 'var(--app-muted, #8B7663)' }}>
           Monitor product quantities and manage your stock levels.
         </p>
       </section>
@@ -190,7 +196,7 @@ export default function Inventory() {
             </caption>
             <thead
               className="text-xs uppercase tracking-wider"
-              style={{ backgroundColor: `${accent}18`, color: accent }}
+              style={{ backgroundColor: 'var(--panel-head, #f4f1ea)', color: 'var(--panel-head-text, #a18b69)' }}
             >
               <tr>
                 <th scope="col" className="px-5 py-3 font-medium">Product</th>
@@ -224,6 +230,12 @@ export default function Inventory() {
                   editing.id === it.id &&
                   editing.kind === it.kind
 
+                const typed = isEditing ? Number(editing.value) : NaN
+                const previewTotal =
+                  isEditing && editing.value !== '' && Number.isInteger(typed)
+                    ? (editing.mode === 'add' ? it.current_stock + typed : typed)
+                    : null
+
                 return (
                   <tr
                     key={`${it.kind}-${it.id}`}
@@ -244,17 +256,35 @@ export default function Inventory() {
 
                     <td className="px-5 py-4">
                       {isEditing ? (
-                        <input
-                          type="number"
-                          min="0"
-                          value={editing.value}
-                          onChange={e =>
-                            setEditing({ ...editing, value: e.target.value })
-                          }
-                          className="w-24 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-                          style={{ borderColor: accent }}
-                          aria-label={`New stock for ${it.product} ${it.variant || ''}`}
-                        />
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={editing.mode}
+                              onChange={e => setEditing({ ...editing, mode: e.target.value })}
+                              className="rounded-lg border bg-white px-2 py-2 text-xs outline-none"
+                              style={{ borderColor: accent }}
+                              aria-label="Stock action"
+                            >
+                              <option value="add">Add stock</option>
+                              <option value="set">Set total</option>
+                            </select>
+                            <input
+                              type="number"
+                              min={editing.mode === 'add' ? 1 : 0}
+                              autoFocus
+                              value={editing.value}
+                              placeholder={editing.mode === 'add' ? '+ qty' : 'total'}
+                              onChange={e => setEditing({ ...editing, value: e.target.value })}
+                              onKeyDown={e => { if (e.key === 'Enter') saveEdit() }}
+                              className="w-24 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
+                              style={{ borderColor: accent }}
+                              aria-label={`Stock quantity for ${it.product} ${it.variant || ''}`}
+                            />
+                          </div>
+                          <p className="text-xs text-[#8B7663]">
+                            New total: <strong className="text-[#292725]">{previewTotal ?? '—'}</strong>
+                          </p>
+                        </div>
                       ) : (
                         <span className="font-semibold text-[#292725]">
                           {it.current_stock}
@@ -305,7 +335,7 @@ export default function Inventory() {
                           }}
                           aria-label={`Update stock for ${it.product} ${it.variant || ''}`}
                         >
-                          Update Stock
+                          Add Stock
                         </button>
                       )}
                     </td>
@@ -317,7 +347,7 @@ export default function Inventory() {
         </div>
       </section>
 
-      <p className="text-xs leading-relaxed text-[#8B7663]">
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--app-muted, #8B7663)' }}>
         <strong>Stock status rules:</strong> Out of Stock = 0 items ·
         Low Stock = stock is less than or equal to safety stock ·
         In Stock = stock is above safety stock.

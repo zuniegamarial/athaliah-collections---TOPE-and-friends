@@ -12,13 +12,6 @@ def get_db():
     return conn
 
 def init_db():
-    # Force clean database reload to reset products
-    if os.path.exists(DB_PATH):
-        try:
-            os.remove(DB_PATH)
-        except Exception:
-            pass
-
     conn = get_db()
     cur = conn.cursor()
     
@@ -29,14 +22,15 @@ def init_db():
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'customer',
+        biometric_enabled INTEGER NOT NULL DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS user_preferences (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER UNIQUE NOT NULL,
-        background_color TEXT NOT NULL DEFAULT '#f7f5f0',
-        accent_color TEXT NOT NULL DEFAULT '#a18b69',
+        background_color TEXT NOT NULL DEFAULT '#0f172a',
+        accent_color TEXT NOT NULL DEFAULT '#6366f1',
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
@@ -107,39 +101,108 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_id INTEGER NOT NULL,
         product_id INTEGER,
-        variant_id INTEGER,
         product_name TEXT NOT NULL,
-        variant_label TEXT,
         quantity INTEGER NOT NULL,
         price REAL NOT NULL,
         FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_addresses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL,
+        address TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
     );
     """)
 
     # Seed Admin Account
     admin_pw = generate_password_hash("admin123")
     cur.execute("""
-        INSERT OR IGNORE INTO users (id, username, email, password_hash, role)
+        INSERT INTO users (id, username, email, password_hash, role)
         VALUES (1, 'admin', 'admin@athaliah.com', ?, 'admin')
+        ON CONFLICT(id) DO UPDATE SET
+            username=excluded.username,
+            email=excluded.email,
+            password_hash=excluded.password_hash,
+            role=excluded.role
     """, (admin_pw,))
 
+    # Seed Categories
+    cur.execute("INSERT OR IGNORE INTO categories (id, name, description) VALUES (1, 'Footwear', 'Performance and casual shoes')")
+    cur.execute("INSERT OR IGNORE INTO categories (id, name, description) VALUES (2, 'Accessories', 'Jewelry and bracelets')")
+    cur.execute("INSERT OR IGNORE INTO categories (id, name, description) VALUES (3, 'Fragrances & Swirls', 'Perfumes and aromatic items')")
+
+    # Seed Products with local images
+    products = [
+        ("Adizero Adios Pro 4", "ATH-FTW-01", 8999.00, 10, 1, "/images/Adizero-Adios-Pro4.png"),
+        ("Adizero Adios Pro M", "ATH-FTW-02", 8499.00, 12, 1, "/images/Adizero-Adios-ProM.png"),
+        ("Athaliah Signature Bracelet 1", "ATH-ACC-01", 799.00, 20, 2, "/images/Athaliah-bracelet1.png"),
+        ("Athaliah Signature Bracelet 2", "ATH-ACC-02", 899.00, 18, 2, "/images/Athaliah-bracelet2.png"),
+        ("Athaliah Signature Bracelet 3", "ATH-ACC-03", 999.00, 15, 2, "/images/Athaliah-bracelet3.png"),
+        ("Cloudrunner", "ATH-FTW-03", 6499.00, 14, 1, "/images/Cloudrunner.png"),
+        ("Cloudtilt Remix", "ATH-FTW-04", 6999.00, 10, 1, "/images/Cloudtild-remix.png"),
+        ("Cloud X4", "ATH-FTW-05", 5999.00, 20, 1, "/images/Cloudx4.png"),
+        ("Cloud X White", "ATH-FTW-06", 5999.00, 25, 1, "/images/CloudxWhite.png"),
+        ("Daily Swirl 1", "ATH-FRG-01", 1299.00, 30, 3, "/images/Daily-Swirl1.png"),
+        ("Daily Swirl 2", "ATH-FRG-02", 1299.00, 30, 3, "/images/Daily-Swirl2.png"),
+        ("Kobe V Protro", "ATH-FTW-07", 9499.00, 8, 1, "/images/KobeVprotro.png"),
+        ("New Balance 1906R", "ATH-FTW-08", 7999.00, 16, 1, "/images/Newbalance1906R.png"),
+        ("Nike Zoom Vomero 5", "ATH-FTW-09", 7499.00, 22, 1, "/images/Nike-Zoom-Vomero5.png"),
+        ("Nike V5 RNR", "ATH-FTW-10", 6899.00, 12, 1, "/images/Nikev5RNR.png")
+    ]
+
+    for name, sku, price, stock, cat_id, img in products:
+        cur.execute("""
+            INSERT INTO products (name, sku, description, price, stock, category_id, image_url, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
+            ON CONFLICT(sku) DO UPDATE SET image_url=excluded.image_url
+        """, (name, sku, f"Exclusive Athaliah Collections item: {name}", price, stock, cat_id, img))
+
+    # ---------- MIGRATIONS (safe to run on every start) ----------
+    def ensure_column(table, column, ddl):
+        cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
+        if column not in cols:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+    ensure_column("customers", "user_id", "INTEGER")
+    ensure_column("orders", "payment_method", "TEXT DEFAULT 'COD'")
+    ensure_column("orders", "payment_reference", "TEXT")
+    ensure_column("orders", "shipping_address", "TEXT")
+    ensure_column("orders", "contact_phone", "TEXT")
+
+    # one-time: remove the fake default address that registration used to add
+    version = cur.execute("PRAGMA user_version").fetchone()[0]
+    if version < 1:
+        cur.execute("UPDATE customers SET address = '' WHERE address = 'Legazpi City'")
+        cur.execute("PRAGMA user_version = 1")
+
+    # link customer records to login accounts by email
     cur.execute("""
-        INSERT OR IGNORE INTO customers (id, first_name, last_name, full_name, email, phone, address)
-        VALUES (1, 'Admin', 'User', 'Administrator', 'admin@athaliah.com', '09123456789', 'Legazpi City')
+        UPDATE customers
+        SET user_id = (SELECT u.id FROM users u
+                       WHERE LOWER(u.email) = LOWER(customers.email) AND u.role = 'customer' LIMIT 1)
+        WHERE user_id IS NULL AND email IS NOT NULL AND TRIM(email) != ''
     """)
 
-    # Seed Original Store Products Only
-    cur.executescript("""
-        INSERT OR IGNORE INTO products (id, name, sku, description, price, stock, safety_stock, image_url, status) VALUES
-        (1, 'Classic Sneakers', 'ATH-SNK-001', 'Comfortable everyday casual sneakers', 1299.00, 50, 5, 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500', 'Active'),
-        (2, 'Athaliah Signature Perfume', 'ATH-PRF-002', 'Long-lasting luxury fragrance', 450.00, 30, 5, 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=500', 'Active'),
-        (3, 'Elegant Handbag', 'ATH-BAG-003', 'Chic fashion accessory for any occasion', 899.00, 20, 5, 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500', 'Active'),
-        (4, 'Silver Necklace', 'ATH-ACC-004', 'Dainty sterling silver pendant necklace', 299.00, 40, 5, 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=500', 'Active'),
-        (5, 'Minimalist Watch', 'ATH-ACC-005', 'Classic leather strap timepiece', 1099.00, 15, 3, 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500', 'Active'),
-        (6, 'Silk Scarf', 'ATH-ACC-006', 'Soft premium patterned neck scarf', 350.00, 25, 5, 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=500', 'Active'),
-        (7, 'Scented Soy Candle', 'ATH-HOM-007', 'Relaxing vanilla and lavender aroma', 250.00, 60, 10, 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=500', 'Active'),
-        (8, 'Gold Hoop Earrings', 'ATH-ACC-008', 'Lightweight everyday statement earrings', 399.00, 35, 5, 'https://images.unsplash.com/photo-1630019852942-f89202989a59?w=500', 'Active');
+    # every customer account must appear in the customers list
+    missing = cur.execute("""
+        SELECT id, username, email FROM users
+        WHERE role = 'customer'
+          AND id NOT IN (SELECT user_id FROM customers WHERE user_id IS NOT NULL)
+    """).fetchall()
+    for u in missing:
+        cur.execute("INSERT INTO customers (full_name, email, user_id) VALUES (?, ?, ?)",
+                    (u["username"], u["email"], u["id"]))
+
+    # keep saved addresses in the address book
+    cur.execute("""
+        INSERT INTO customer_addresses (customer_id, address)
+        SELECT c.id, c.address FROM customers c
+        WHERE c.address IS NOT NULL AND TRIM(c.address) != ''
+          AND NOT EXISTS (SELECT 1 FROM customer_addresses a
+                          WHERE a.customer_id = c.id AND a.address = c.address)
     """)
 
     conn.commit()
@@ -147,4 +210,4 @@ def init_db():
 
 if __name__ == "__main__":
     init_db()
-    print("Database reset successfully to original products!")
+    print("Database initialized successfully with variants and products!")

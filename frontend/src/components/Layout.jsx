@@ -22,6 +22,30 @@ const nav = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
+// Blend two hex colors (amount = how much of `other` to mix in)
+function mix(hex, other, amount) {
+  const parse = (h) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec((h || '').trim())
+    if (!m) return null
+    const n = parseInt(m[1], 16)
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  }
+  const a = parse(hex)
+  const b = parse(other)
+  if (!a || !b) return hex
+  const c = a.map((v, i) => Math.round(v + (b[i] - v) * amount))
+  return `#${c.map(v => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+// Pick readable text colors for whatever background the admin chose in Settings
+function isDarkColor(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim())
+  if (!m) return false
+  const n = parseInt(m[1], 16)
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5
+}
+
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -52,10 +76,26 @@ export default function Layout() {
     }
   }, [location.pathname])
 
+  const dark = isDarkColor(backgroundColor)
+  const textColor = dark ? '#F1F5F9' : '#292725'
+  const mutedColor = dark ? '#CBD5E1' : '#8B7663'
+
   useEffect(() => {
-    document.documentElement.style.setProperty('--app-background', backgroundColor)
-    document.documentElement.style.setProperty('--app-accent', accentColor)
-  }, [backgroundColor, accentColor])
+    const root = document.documentElement.style
+    root.setProperty('--app-background', backgroundColor)
+    root.setProperty('--app-accent', accentColor)
+    root.setProperty('--app-text', textColor)
+    root.setProperty('--app-muted', mutedColor)
+
+    // Cards / tables / inputs follow the theme (dark panels on a dark background)
+    root.setProperty('--panel-bg', dark ? mix(backgroundColor, '#ffffff', 0.07) : '#ffffff')
+    root.setProperty('--panel-head', dark ? mix(backgroundColor, '#ffffff', 0.035) : `${accentColor}18`)
+    root.setProperty('--panel-head-text', dark ? '#CBD5E1' : accentColor)
+    root.setProperty('--panel-border', dark ? mix(backgroundColor, '#ffffff', 0.16) : `${accentColor}66`)
+    root.setProperty('--panel-text', dark ? '#F1F5F9' : '#292725')
+    root.setProperty('--panel-muted', dark ? '#94A3B8' : '#8B7663')
+    root.setProperty('--input-bg', dark ? mix(backgroundColor, '#000000', 0.25) : '#ffffff')
+  }, [backgroundColor, accentColor, textColor, mutedColor, dark])
 
   const logout = async () => {
     try {
@@ -64,13 +104,14 @@ export default function Layout() {
       console.error('Logout error:', error)
     }
 
-    navigate('/login')
+    navigate('/admin')
   }
 
   return (
     <div
-      className="flex h-screen overflow-hidden text-[#292725]"
-      style={{ backgroundColor }}
+      className="flex h-screen overflow-hidden"
+      data-app-dark={dark ? 'true' : 'false'}
+      style={{ backgroundColor, color: textColor }}
     >
       {/* FIXED SIDEBAR: Sticks to the left and takes full viewport height */}
       <aside
@@ -114,11 +155,11 @@ export default function Layout() {
                     `flex items-center gap-3 rounded px-3 py-3 text-sm transition ${
                       isActive
                         ? 'font-medium text-white'
-                        : 'text-[#6F5C4B] hover:bg-white/50'
+                        : 'hover:bg-white/10'
                     }`
                   }
                   style={({ isActive }) =>
-                    isActive ? { backgroundColor: accentColor } : {}
+                    isActive ? { backgroundColor: accentColor } : { color: textColor }
                   }
                 >
                   <Icon size={18} />
@@ -135,7 +176,7 @@ export default function Layout() {
         >
           <button
             onClick={logout}
-            className="flex w-full items-center gap-3 rounded px-3 py-3 text-sm transition hover:bg-white/50"
+            className="flex w-full items-center gap-3 rounded px-3 py-3 text-sm transition hover:bg-white/10"
             style={{ color: accentColor }}
           >
             <LogOut size={18} />
@@ -172,7 +213,7 @@ export default function Layout() {
         {/* SCROLLABLE MAIN CONTENT AREA */}
         <main
           className="flex-1 overflow-y-auto p-6 transition-colors duration-300"
-          style={{ backgroundColor }}
+          style={{ backgroundColor, color: textColor }}
         >
           <Outlet />
         </main>

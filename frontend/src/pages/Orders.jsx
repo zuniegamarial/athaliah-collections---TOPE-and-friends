@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -14,6 +13,25 @@ import {
 import { api } from '../api'
 import { OrderStatusBadge } from '../components/StatusBadge'
 
+const formatDate = (v) => {
+  if (!v) return '—'
+  const d = new Date(String(v).replace(' ', 'T') + 'Z') // server stores UTC
+  return isNaN(d) ? v : d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function BiometricBadge({ enabled }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+        enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+      {enabled ? 'Enabled' : 'Disabled'}
+    </span>
+  )
+}
+
 export default function Orders() {
   const [orders, setOrders] = useState([])
   const [q, setQ] = useState('')
@@ -22,19 +40,24 @@ export default function Orders() {
   const accent = 'var(--app-accent, #a18b69)'
 
   const panelStyle = {
-    backgroundColor: 'white',
-    borderColor: `${accent}66`,
+    backgroundColor: 'var(--panel-bg, white)',
+    color: 'var(--panel-text, #292725)',
+    borderColor: 'var(--panel-border, #ded8cd)',
   }
 
   useEffect(() => {
-    api.orders().then(setOrders).catch(() => {})
+    const load = () => api.orders().then(setOrders).catch(() => {})
+    load()
+    const timer = setInterval(load, 15000) // new customer orders appear without refreshing
+    return () => clearInterval(timer)
   }, [])
 
   const filtered = orders.filter(o => {
     const matchesQ =
       !q ||
       (o.order_number || '').toLowerCase().includes(q.toLowerCase()) ||
-      (o.customer || '').toLowerCase().includes(q.toLowerCase())
+      (o.customer || '').toLowerCase().includes(q.toLowerCase()) ||
+      (o.items_summary || '').toLowerCase().includes(q.toLowerCase())
 
     const matchesStatus =
       status === 'all' || o.order_status === status
@@ -66,7 +89,7 @@ export default function Orders() {
   ]
 
   return (
-    <div className="space-y-6 text-[#292725]">
+    <div className="space-y-6" style={{ color: 'var(--app-text, #292725)' }}>
 
       {/* Page Heading */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -77,7 +100,7 @@ export default function Orders() {
               Orders
             </h1>
           </div>
-          <p className="mt-1 text-sm text-[#8B7663]">
+          <p className="mt-1 text-sm" style={{ color: 'var(--app-muted, #8B7663)' }}>
             Manage and monitor customer orders.
           </p>
         </div>
@@ -180,6 +203,7 @@ export default function Orders() {
               <option value="Processing">Processing</option>
               <option value="Shipped">Shipped</option>
               <option value="Delivered">Delivered</option>
+              <option value="Cancelled">Cancelled</option>
               <option value="Refunded">Refunded</option>
             </select>
           </div>
@@ -193,13 +217,14 @@ export default function Orders() {
             <thead
               className="text-left text-xs uppercase tracking-wider"
               style={{
-                backgroundColor: `${accent}18`,
-                color: accent,
+                backgroundColor: 'var(--panel-head, #f4f1ea)',
+                color: 'var(--panel-head-text, #a18b69)',
               }}
             >
               <tr>
                 <th scope="col" className="px-5 py-4">Order #</th>
                 <th scope="col" className="px-5 py-4">Customer</th>
+                <th scope="col" className="px-5 py-4">Biometrics</th>
                 <th scope="col" className="px-5 py-4">Date</th>
                 <th scope="col" className="px-5 py-4">Total</th>
                 <th scope="col" className="px-5 py-4">Payment</th>
@@ -211,7 +236,7 @@ export default function Orders() {
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center">
+                  <td colSpan={8} className="px-5 py-12 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <RotateCcw size={25} style={{ color: accent }} />
                       <p className="font-medium text-[#6F5C4B]">
@@ -238,12 +263,24 @@ export default function Orders() {
                     {o.order_number}
                   </td>
 
-                  <td className="px-5 py-4 font-medium">
-                    {o.customer}
+                  <td className="px-5 py-4">
+                    <p className="font-medium">{o.customer}</p>
+                    {o.customer_email && (
+                      <p className="text-xs text-[#8B7663]">{o.customer_email}</p>
+                    )}
+                    {o.items_summary && (
+                      <p className="mt-0.5 max-w-[220px] truncate text-xs text-[#8B7663]" title={o.items_summary}>
+                        {o.items_summary}
+                      </p>
+                    )}
+                  </td>
+
+                  <td className="px-5 py-4">
+                    <BiometricBadge enabled={o.biometric_enabled} />
                   </td>
 
                   <td className="whitespace-nowrap px-5 py-4 text-xs text-[#8B7663]">
-                    {o.order_date}
+                    {formatDate(o.order_date)}
                   </td>
 
                   <td className="whitespace-nowrap px-5 py-4 font-semibold">
@@ -251,7 +288,8 @@ export default function Orders() {
                   </td>
 
                   <td className="px-5 py-4">
-                    {o.payment_status}
+                    <p className="font-medium">{o.payment_method}</p>
+                    <p className="text-xs text-[#8B7663]">{o.payment_status}</p>
                   </td>
 
                   <td className="whitespace-nowrap px-5 py-4">

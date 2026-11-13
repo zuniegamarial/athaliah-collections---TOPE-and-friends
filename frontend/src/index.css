@@ -11,3 +11,62 @@
 
 html, body, #root { height: 100%; }
 body { font-family: system-ui, -apple-system, sans-serif; }
+
+/* ---------------------------------------------------------------
+   Admin portal DARK theme
+   Layout.jsx sets the --panel-* colors from the background you pick in
+   Settings. These rules turn any white card, table, input or hard-coded
+   dark text on the admin pages into the dark theme.
+---------------------------------------------------------------- */
+:root {
+  --panel-bg: #ffffff;
+  --panel-head: #f4f1ea;
+  --panel-head-text: #a18b69;
+  --panel-border: #ded8cd;
+  --panel-text: #292725;
+  --panel-muted: #8b7663;
+  --input-bg: #ffffff;
+}
+
+/* default borders (explicit border colors on elements still win) */
+:where([data-app-dark="true"] main *) { border-color: var(--panel-border); }
+
+/* white cards */
+[data-app-dark="true"] main .bg-white,
+[data-app-dark="true"] main [style*="background-color: white"],
+[data-app-dark="true"] main [style*="rgb(255, 255, 255)"] {
+  background-color: var(--panel-bg) !important;
+}
+
+/* light-gray table heads / badges / hover rows */
+[data-app-dark="true"] main :is(.bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100, .bg-stone-50) {
+  background-color: var(--panel-head) !important;
+}
+[data-app-dark="true"] main tbody tr:hover { background-color: rgba(255, 255, 255, 0.04); }
+[data-app-dark="true"] main .hover\:bg-gray-50:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+
+/* text */
+[data-app-dark="true"] main :is(
+  .text-black, .text-gray-900, .text-gray-800, .text-gray-700,
+  .text-slate-900, .text-slate-800, .text-slate-700,
+  .text-\[\#292725\], .text-\[\#4A4038\], .text-\[\#6F5C4B\]
+) { color: var(--panel-text) !important; }
+
+[data-app-dark="true"] main :is(
+  .text-gray-600, .text-gray-500, .text-gray-400,
+  .text-slate-600, .text-slate-500,
+  .text-\[\#8B7663\], .text-\[\#A58F7B\], .text-\[\#777067\], .text-\[\#B6AA9B\]
+) { color: var(--panel-muted) !important; }
+
+/* borders that were hard-coded light gray */
+[data-app-dark="true"] main :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-200, .border-slate-300) {
+  border-color: var(--panel-border) !important;
+}
+
+/* form fields */
+[data-app-dark="true"] main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not(.bg-transparent) {
+  background-color: var(--input-bg) !important;
+  color: var(--panel-text) !important;
+}
+[data-app-dark="true"] main option { background-color: var(--panel-bg); color: var(--panel-text); }
+[data-app-dark="true"] main ::placeholder { color: var(--panel-muted); opacity: 0.75; }

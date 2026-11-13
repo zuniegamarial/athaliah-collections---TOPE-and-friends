@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { Plus, Pencil, Trash2, FolderTree, X } from 'lucide-react'
@@ -94,25 +93,26 @@ export default function Categories() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f5f0] p-6 md:p-8">
-      <div className="mx-auto max-w-6xl">
+    <div className="space-y-8 text-slate-100">
+      <div className="mx-auto max-w-6xl space-y-8">
 
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a18b69]">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400">
               Product Management
             </p>
-            <h1 className="mt-2 text-3xl font-semibold text-[#302d29]">
+            <h1 className="mt-2 text-3xl font-light text-white tracking-wide">
               Categories
             </h1>
-            <p className="mt-2 text-sm text-[#81796e]">
+            <p className="mt-1 text-sm text-slate-300">
               Organize your products into categories.
             </p>
           </div>
 
           <button
             onClick={openAddForm}
-            className="flex items-center gap-2 rounded-lg bg-[#39352f] px-5 py-3 text-sm font-medium text-white hover:bg-[#514a40]"
+            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-indigo-700 transition shadow-lg"
           >
             <Plus size={17} />
             Add Category
@@ -120,22 +120,23 @@ export default function Categories() {
         </div>
 
         {error && !showForm && (
-          <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
             {error}
           </div>
         )}
 
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-[#e9e3d8] bg-white p-5">
-            <p className="text-sm text-[#81796e]">Total Categories</p>
-            <p className="mt-2 text-3xl font-semibold text-[#302d29]">
+        {/* Metric Cards */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-xl">
+            <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Categories</p>
+            <p className="mt-3 text-4xl font-bold text-white">
               {categories.length}
             </p>
           </div>
 
-          <div className="rounded-xl border border-[#e9e3d8] bg-white p-5">
-            <p className="text-sm text-[#81796e]">Products Organized</p>
-            <p className="mt-2 text-3xl font-semibold text-[#302d29]">
+          <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-xl">
+            <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Products Organized</p>
+            <p className="mt-3 text-4xl font-bold text-white">
               {categories.reduce(
                 (total, category) => total + (category.product_count || 0),
                 0
@@ -144,15 +145,16 @@ export default function Categories() {
           </div>
         </div>
 
+        {/* Form Modal */}
         {showForm && (
-          <div className="mb-6 rounded-xl border border-[#e9e3d8] bg-white p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[#302d29]">
+          <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between border-b border-slate-700 pb-4">
+              <h2 className="text-lg font-bold text-white">
                 {editingId ? 'Edit Category' : 'Add New Category'}
               </h2>
               <button
                 onClick={() => setShowForm(false)}
-                className="rounded-lg p-2 text-[#81796e] hover:bg-[#f4f1eb]"
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-700 transition"
               >
                 <X size={19} />
               </button>
@@ -160,8 +162,8 @@ export default function Categories() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-[#514a40]">
-                  Category Name *
+                <label className="mb-2 block text-xs font-medium tracking-wider text-slate-300">
+                  CATEGORY NAME *
                 </label>
                 <input
                   type="text"
@@ -170,14 +172,14 @@ export default function Categories() {
                     setForm({ ...form, name: e.target.value })
                   }
                   placeholder="e.g. Skincare"
-                  className="w-full rounded-lg border border-[#ded7ca] px-4 py-3 text-sm outline-none focus:border-[#a18b69]"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-indigo-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-[#514a40]">
-                  Description
+                <label className="mb-2 block text-xs font-medium tracking-wider text-slate-300">
+                  DESCRIPTION
                 </label>
                 <textarea
                   value={form.description}
@@ -186,19 +188,19 @@ export default function Categories() {
                   }
                   placeholder="Describe this category..."
                   rows="3"
-                  className="w-full rounded-lg border border-[#ded7ca] px-4 py-3 text-sm outline-none focus:border-[#a18b69]"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-indigo-500"
                 />
               </div>
 
               {error && (
-                <p className="text-sm text-red-600">{error}</p>
+                <p className="text-xs text-red-400">{error}</p>
               )}
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3 pt-2">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-lg bg-[#39352f] px-5 py-3 text-sm font-medium text-white hover:bg-[#514a40] disabled:opacity-50"
+                  className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-indigo-700 disabled:opacity-50 transition shadow-lg"
                 >
                   {saving
                     ? 'Saving...'
@@ -210,7 +212,7 @@ export default function Categories() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="rounded-lg border border-[#ded7ca] px-5 py-3 text-sm text-[#514a40] hover:bg-[#f7f5f0]"
+                  className="rounded-xl border border-slate-700 px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-300 hover:bg-slate-700 transition"
                 >
                   Cancel
                 </button>
@@ -219,50 +221,51 @@ export default function Categories() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-[#e9e3d8] bg-white">
-          <div className="border-b border-[#eee9e0] px-6 py-5">
-            <h2 className="font-semibold text-[#302d29]">
+        {/* Categories List Container */}
+        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-xl">
+          <div className="border-b border-slate-700 px-6 py-5 bg-slate-850">
+            <h2 className="font-semibold text-white">
               All Categories
             </h2>
           </div>
 
           {loading ? (
-            <div className="p-10 text-center text-sm text-[#81796e]">
+            <div className="p-10 text-center text-sm text-slate-400">
               Loading categories...
             </div>
           ) : categories.length === 0 ? (
             <div className="p-12 text-center">
               <FolderTree
                 size={36}
-                className="mx-auto mb-3 text-[#b8ad9c]"
+                className="mx-auto mb-3 text-slate-500"
               />
-              <h3 className="font-medium text-[#302d29]">
+              <h3 className="font-medium text-white">
                 No categories yet
               </h3>
-              <p className="mt-2 text-sm text-[#81796e]">
+              <p className="mt-1 text-sm text-slate-400">
                 Add your first category to organize your products.
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-[#eee9e0]">
-              {categories.map((category) => (
+            <div className="divide-y divide-slate-700">
+              {categories.order_date ? null : categories.map((category) => (
                 <div
                   key={category.id}
-                  className="flex flex-wrap items-center justify-between gap-4 px-6 py-5"
+                  className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 hover:bg-slate-750 transition"
                 >
                   <div className="flex min-w-0 items-center gap-4">
-                    <div className="rounded-lg bg-[#f4f0e8] p-3 text-[#927b57]">
+                    <div className="rounded-xl bg-slate-900 border border-slate-700 p-3 text-indigo-400">
                       <FolderTree size={20} />
                     </div>
 
                     <div className="min-w-0">
-                      <h3 className="font-medium text-[#302d29]">
+                      <h3 className="font-semibold text-white">
                         {category.name}
                       </h3>
-                      <p className="mt-1 text-sm text-[#81796e]">
+                      <p className="mt-0.5 text-sm text-slate-300">
                         {category.description || 'No description'}
                       </p>
-                      <p className="mt-1 text-xs text-[#a18b69]">
+                      <p className="mt-1 text-xs text-indigo-400 font-medium">
                         {category.product_count || 0} products
                       </p>
                     </div>
@@ -272,7 +275,7 @@ export default function Categories() {
                     <button
                       onClick={() => openEditForm(category)}
                       title="Edit category"
-                      className="rounded-lg border border-[#e9e3d8] p-2.5 text-[#716653] hover:bg-[#f7f5f0]"
+                      className="rounded-xl border border-slate-700 bg-slate-900 p-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition"
                     >
                       <Pencil size={16} />
                     </button>
@@ -280,7 +283,7 @@ export default function Categories() {
                     <button
                       onClick={() => handleDelete(category)}
                       title="Delete category"
-                      className="rounded-lg border border-[#f0dada] p-2.5 text-red-600 hover:bg-red-50"
+                      className="rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-red-400 hover:bg-red-500/20 transition"
                     >
                       <Trash2 size={16} />
                     </button>

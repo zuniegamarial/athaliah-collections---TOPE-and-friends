@@ -1,18 +1,24 @@
+const BASE = ''; // same-origin: Vite proxies /api to Flask (see vite.config.js)
 
-const BASE = '';
+// Admin and customer logins are separate; tell the server which one is asking.
+const portal = () => {
+  const p = window.location.pathname;
+  return p === '/' || p.startsWith('/store') ? 'store' : 'admin';
+};
 
 async function request(path, options = {}) {
   const res = await fetch(BASE + path, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: { 'Content-Type': 'application/json', 'X-Portal': portal(), ...(options.headers || {}) },
   });
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { error: 'Invalid server response' }; }
 
   if (!res.ok) {
-    const err = new Error(data.error || 'Request failed');
+    const err = new Error(data.message || data.error || 'Request failed');
     err.data = data;
     err.status = res.status;
     throw err;
@@ -23,9 +29,15 @@ async function request(path, options = {}) {
 
 export const api = {
   login: (body) => request('/api/login', { method: 'POST', body: JSON.stringify(body) }),
+  logout: () => {
+    // only forget the sign-in; keep carts and saved data on this device
+    ['athaliah_active_user', 'athaliah_role', 'athaliah_logged_in', 'role', 'username',
+     'isAuthenticated', 'isAdmin', 'pending_mfa_user'].forEach(k => localStorage.removeItem(k));
+    return request('/api/logout', { method: 'POST' });
+  },
   mfa: (body) => request('/api/mfa', { method: 'POST', body: JSON.stringify(body) }),
-  logout: () => request('/api/logout', { method: 'POST' }),
   me: () => request('/api/me'),
+  currentUser: () => request('/api/current_user'),
 
   dashboard: () => request('/api/dashboard'),
 
@@ -40,33 +52,22 @@ export const api = {
 
   orders: () => request('/api/orders'),
   order: (id) => request(`/api/orders/${id}`),
+  createOrder: (b) => request('/api/orders', { method: 'POST', body: JSON.stringify(b) }),
   updateOrderStatus: (id, status) => request(`/api/orders/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status }),
   }),
-  addTracking: (id, tracking_number) => request(`/api/orders/${id}/tracking`, {
-    method: 'POST',
-    body: JSON.stringify({ tracking_number }),
-  }),
-  shippingLabel: (id) => request(`/api/orders/${id}/shipping-label`, { method: 'POST' }),
-  refundOrder: (id) => request(`/api/orders/${id}/refund`, { method: 'POST' }),
 
   customers: () => request('/api/customers'),
   createCustomer: (b) => request('/api/customers', { method: 'POST', body: JSON.stringify(b) }),
 
+  storeOrders: () => request('/api/store/orders'),
+  cancelStoreOrder: (id) => request(`/api/store/orders/${id}/cancel`, { method: 'POST' }),
+  profile: () => request('/api/profile'),
+  updateProfile: (b) => request('/api/profile', { method: 'PUT', body: JSON.stringify(b) }),
+  addAddress: (address) => request('/api/profile/addresses', { method: 'POST', body: JSON.stringify({ address }) }),
+  deleteAddress: (id) => request(`/api/profile/addresses/${id}`, { method: 'DELETE' }),
   categories: () => request('/api/categories'),
-  createCategory: (b) => request('/api/categories', {
-    method: 'POST',
-    body: JSON.stringify(b),
-  }),
-  updateCategory: (id, b) => request(`/api/categories/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(b),
-  }),
-  deleteCategory: (id) => request(`/api/categories/${id}`, {
-    method: 'DELETE',
-  }),
-
   preferences: () => request('/api/preferences'),
   updatePreferences: (b) => request('/api/preferences', {
     method: 'PUT',
