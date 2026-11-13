@@ -11,8 +11,6 @@ import re
 app = Flask(__name__)
 
 # ---------- SEPARATE ADMIN / CUSTOMER LOGINS ----------
-# A browser has one cookie jar, so signing in as admin in one tab used to replace the
-# customer signed in in another tab. Each portal now gets its own slot in the session.
 def current_portal():
     explicit = (request.headers.get("X-Portal") or "").lower()
     if explicit in ("admin", "store"):
@@ -139,7 +137,6 @@ def stock_status(stock, safety):
     return "In Stock"
 
 def get_customer_for_user(conn, user_id, create=True):
-    """Find (or create) the customers row that belongs to a login account."""
     cust = conn.execute("SELECT * FROM customers WHERE user_id = ?", (user_id,)).fetchone()
     if cust:
         return cust
@@ -225,7 +222,6 @@ def register():
 def login():
     try:
         data = request.get_json(silent=True) or {}
-        
         identifier = (data.get('username') or data.get('email') or "").strip()
         password = data.get('password') or ""
         
@@ -290,8 +286,7 @@ def store_login():
     try:
         data = request.get_json(silent=True) or {}
         username = (data.get('username') or "").strip()
-        biometric_verified = data.get('biometric_verified')
-
+        
         if not username:
             return jsonify({"success": False, "message": "Username is required."}), 400
 
@@ -395,7 +390,6 @@ def me():
 
 @app.route("/api/mfa", methods=["POST"])
 def verify_mfa():
-    # Step 2 of admin sign-in: requires a logged-in admin session first
     if not session.get("user_id"):
         return jsonify({"error": "Please sign in first."}), 401
     if session.get("role") != "admin":
@@ -696,9 +690,9 @@ def update_inventory(vid):
         return jsonify({"error": "Product not found."}), 404
     try:
         if data.get("add") is not None:
-            new_stock = product["stock"] + int(data["add"])      # add stock on top of current
+            new_stock = product["stock"] + int(data["add"])
         else:
-            new_stock = int(data.get("stock"))                    # set an exact total
+            new_stock = int(data.get("stock"))
     except (TypeError, ValueError):
         conn.close()
         return jsonify({"error": "Stock must be a whole number."}), 400
@@ -743,7 +737,6 @@ def create_order():
     try:
         customer = get_customer_for_user(conn, session["user_id"])
 
-        # Look up every product on the server: real price, real stock
         wanted = {}
         for it in items:
             try:
@@ -813,7 +806,6 @@ def create_order():
                             status = CASE WHEN stock - ? <= 0 THEN 'Out of Stock' ELSE status END
                             WHERE id = ?""", (qty, qty, p["id"]))
 
-        # remember the address / phone on the customer profile
         exists = conn.execute("SELECT id FROM customer_addresses WHERE customer_id = ? AND address = ?",
                               (customer["id"], shipping_address)).fetchone()
         if not exists:
@@ -963,6 +955,51 @@ def cancel_store_order(oid):
     conn.commit()
     conn.close()
     return jsonify({"message": "Order cancelled."})
+
+# ---------- STOREFRONT: NOTIFICATIONS ----------
+@app.route("/api/store/notifications", methods=["GET"])
+@customer_required
+def store_notifications():
+    conn = get_db()
+    customer = get_customer_for_user(conn, session["user_id"], create=False)
+    if not customer:
+        conn.close()
+        return jsonify([])
+    
+    orders = conn.execute("""
+        SELECT id, order_number, order_date, order_status, payment_status, total
+        FROM orders WHERE customer_id = ? ORDER BY id DESC
+    """, (customer["id"],)).fetchall()
+    
+    notifications = []
+    for idx, o in enumerate(orders, start=1):
+        status = o["order_status"]
+        if status == "Shipped":
+            title = f"Order Shipped ({o['order_number']})"
+            msg = f"Your order is now on its way to your shipping address."
+        elif status == "Delivered":
+            title = f"Order Delivered ({o['order_number']})"
+            msg = f"Your package has been successfully delivered. Thank you!"
+        elif status == "Cancelled":
+            title = f"Order Cancelled ({o['order_number']})"
+            msg = f"Your order has been cancelled."
+        elif status == "Processing":
+            title = f"Order Processing ({o['order_number']})"
+            msg = f"The admin is currently packing your items."
+        else:
+            title = f"Order Placed ({o['order_number']})"
+            msg = f"Your order is pending review by the admin."
+            
+        notifications.append({
+            "id": idx,
+            "title": title,
+            "message": msg,
+            "time": o["order_date"],
+            "status": status
+        })
+        
+    conn.close()
+    return jsonify(notifications)
 
 # ---------- STOREFRONT: PROFILE & ADDRESSES ----------
 def _profile_payload(conn, user_id):

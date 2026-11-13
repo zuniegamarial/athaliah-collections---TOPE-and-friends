@@ -129,24 +129,28 @@ def init_db():
             role=excluded.role
     """, (admin_pw,))
 
-    # Seed Categories
+    # Seed Categories (Renamed to Earrings and Bracelets)
     cur.execute("INSERT OR IGNORE INTO categories (id, name, description) VALUES (1, 'Footwear', 'Performance and casual shoes')")
-    cur.execute("INSERT OR IGNORE INTO categories (id, name, description) VALUES (2, 'Accessories', 'Jewelry and bracelets')")
-    cur.execute("INSERT OR IGNORE INTO categories (id, name, description) VALUES (3, 'Fragrances & Swirls', 'Perfumes and aromatic items')")
+    cur.execute("INSERT OR IGNORE INTO categories (id, name, description) VALUES (2, 'Earrings', 'Stunning earrings and ear ornaments')")
+    cur.execute("INSERT OR IGNORE INTO categories (id, name, description) VALUES (3, 'Bracelets', 'Fine bracelets and wrist accessories')")
+    
+    # Also handle update if the old names already exist in an existing database
+    cur.execute("UPDATE categories SET name = 'Earrings', description = 'Stunning earrings and ear ornaments' WHERE name = 'Accessories'")
+    cur.execute("UPDATE categories SET name = 'Bracelets', description = 'Fine bracelets and wrist accessories' WHERE name = 'Fragrances & Swirls'")
 
     # Seed Products with local images
     products = [
         ("Adizero Adios Pro 4", "ATH-FTW-01", 8999.00, 10, 1, "/images/Adizero-Adios-Pro4.png"),
         ("Adizero Adios Pro M", "ATH-FTW-02", 8499.00, 12, 1, "/images/Adizero-Adios-ProM.png"),
-        ("Athaliah Signature Bracelet 1", "ATH-ACC-01", 799.00, 20, 2, "/images/Athaliah-bracelet1.png"),
-        ("Athaliah Signature Bracelet 2", "ATH-ACC-02", 899.00, 18, 2, "/images/Athaliah-bracelet2.png"),
-        ("Athaliah Signature Bracelet 3", "ATH-ACC-03", 999.00, 15, 2, "/images/Athaliah-bracelet3.png"),
+        ("Athaliah Signature Bracelet 1", "ATH-ACC-01", 799.00, 20, 3, "/images/Athaliah-bracelet1.png"),
+        ("Athaliah Signature Bracelet 2", "ATH-ACC-02", 899.00, 18, 3, "/images/Athaliah-bracelet2.png"),
+        ("Athaliah Signature Bracelet 3", "ATH-ACC-03", 999.00, 15, 3, "/images/Athaliah-bracelet3.png"),
         ("Cloudrunner", "ATH-FTW-03", 6499.00, 14, 1, "/images/Cloudrunner.png"),
         ("Cloudtilt Remix", "ATH-FTW-04", 6999.00, 10, 1, "/images/Cloudtild-remix.png"),
         ("Cloud X4", "ATH-FTW-05", 5999.00, 20, 1, "/images/Cloudx4.png"),
         ("Cloud X White", "ATH-FTW-06", 5999.00, 25, 1, "/images/CloudxWhite.png"),
-        ("Daily Swirl 1", "ATH-FRG-01", 1299.00, 30, 3, "/images/Daily-Swirl1.png"),
-        ("Daily Swirl 2", "ATH-FRG-02", 1299.00, 30, 3, "/images/Daily-Swirl2.png"),
+        ("Daily Swirl 1", "ATH-FRG-01", 1299.00, 30, 2, "/images/Daily-Swirl1.png"),
+        ("Daily Swirl 2", "ATH-FRG-02", 1299.00, 30, 2, "/images/Daily-Swirl2.png"),
         ("Kobe V Protro", "ATH-FTW-07", 9499.00, 8, 1, "/images/KobeVprotro.png"),
         ("New Balance 1906R", "ATH-FTW-08", 7999.00, 16, 1, "/images/Newbalance1906R.png"),
         ("Nike Zoom Vomero 5", "ATH-FTW-09", 7499.00, 22, 1, "/images/Nike-Zoom-Vomero5.png"),
@@ -157,10 +161,10 @@ def init_db():
         cur.execute("""
             INSERT INTO products (name, sku, description, price, stock, category_id, image_url, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')
-            ON CONFLICT(sku) DO UPDATE SET image_url=excluded.image_url
+            ON CONFLICT(sku) DO UPDATE SET image_url=excluded.image_url, category_id=excluded.category_id
         """, (name, sku, f"Exclusive Athaliah Collections item: {name}", price, stock, cat_id, img))
 
-    # ---------- MIGRATIONS (safe to run on every start) ----------
+    # ---------- MIGRATIONS ----------
     def ensure_column(table, column, ddl):
         cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
         if column not in cols:
@@ -172,13 +176,11 @@ def init_db():
     ensure_column("orders", "shipping_address", "TEXT")
     ensure_column("orders", "contact_phone", "TEXT")
 
-    # one-time: remove the fake default address that registration used to add
     version = cur.execute("PRAGMA user_version").fetchone()[0]
     if version < 1:
         cur.execute("UPDATE customers SET address = '' WHERE address = 'Legazpi City'")
         cur.execute("PRAGMA user_version = 1")
 
-    # link customer records to login accounts by email
     cur.execute("""
         UPDATE customers
         SET user_id = (SELECT u.id FROM users u
@@ -186,7 +188,6 @@ def init_db():
         WHERE user_id IS NULL AND email IS NOT NULL AND TRIM(email) != ''
     """)
 
-    # every customer account must appear in the customers list
     missing = cur.execute("""
         SELECT id, username, email FROM users
         WHERE role = 'customer'
@@ -196,7 +197,6 @@ def init_db():
         cur.execute("INSERT INTO customers (full_name, email, user_id) VALUES (?, ?, ?)",
                     (u["username"], u["email"], u["id"]))
 
-    # keep saved addresses in the address book
     cur.execute("""
         INSERT INTO customer_addresses (customer_id, address)
         SELECT c.id, c.address FROM customers c
@@ -210,4 +210,4 @@ def init_db():
 
 if __name__ == "__main__":
     init_db()
-    print("Database initialized successfully with variants and products!")
+    print("Database initialized successfully with Earrings and Bracelets categories!")

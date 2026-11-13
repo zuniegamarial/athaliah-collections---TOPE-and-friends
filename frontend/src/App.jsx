@@ -61,7 +61,7 @@ function PublicHome() {
           Elegance Defined.
         </h2>
         <p className="max-w-xl text-lg text-slate-600 mb-8">
-          Explore our exclusive, hand-picked collection of premium shoes, accessories, perfumes, and luxurious bedsheets in Legazpi City.
+          Explore our exclusive, hand-picked collection of premium shoes and accessories in Legazpi City.
         </p>
         <a href="#showcase" className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-full shadow-lg hover:bg-indigo-500 transition">
           Explore Showcase ↓
