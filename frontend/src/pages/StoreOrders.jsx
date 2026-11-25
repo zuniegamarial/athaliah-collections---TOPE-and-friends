@@ -61,7 +61,7 @@ export default function StoreOrders() {
     return (
       <div className="max-w-md mx-auto mt-10 bg-slate-800 border border-slate-700 rounded-2xl p-8 text-center space-y-4">
         <p className="text-white font-semibold">Please sign in to see your orders.</p>
-        <Link to="/store-auth" style={{ backgroundColor: '#2563eb' }} className="inline-block text-white px-6 py-3 rounded-xl text-xs font-bold tracking-wider">
+        <Link to="/store-auth" style={{ backgroundColor: '#8F5A1D' }} className="inline-block text-white px-6 py-3 rounded-xl text-xs font-bold tracking-wider">
           SIGN IN
         </Link>
       </div>
@@ -87,7 +87,7 @@ export default function StoreOrders() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              style={activeTab === tab ? { backgroundColor: '#2563eb' } : {}}
+              style={activeTab === tab ? { backgroundColor: '#8F5A1D' } : {}}
               className={`flex-1 whitespace-nowrap px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
                 activeTab === tab ? 'text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
               }`}

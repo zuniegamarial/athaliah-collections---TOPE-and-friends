@@ -418,8 +418,8 @@ def get_preferences():
         result = dict(preferences)
     else:
         result = {
-            "background_color": "#0f172a",
-            "accent_color": "#6366f1"
+            "background_color": "#F7F3EC",
+            "accent_color": "#8A5A1C"
         }
     conn.close()
     return jsonify(result)

@@ -184,7 +184,7 @@ export default function StoreCheckout() {
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => navigate('/store/orders')}
-            style={{ backgroundColor: '#2563eb' }}
+            style={{ backgroundColor: '#8F5A1D' }}
             className="flex-1 text-white py-3 rounded-xl text-xs font-bold tracking-wider hover:opacity-90 transition"
           >
             View My Orders
@@ -209,7 +209,7 @@ export default function StoreCheckout() {
         <p className="text-sm text-slate-300">Sign in with your customer account.</p>
         <Link
           to="/store-auth"
-          style={{ backgroundColor: '#2563eb' }}
+          style={{ backgroundColor: '#8F5A1D' }}
           className="inline-block text-white px-6 py-3 rounded-xl text-xs font-bold tracking-wider hover:opacity-90 transition"
         >
           SIGN IN
@@ -287,7 +287,7 @@ export default function StoreCheckout() {
                     <button
                       type="button"
                       onClick={saveAddress}
-                      style={{ backgroundColor: '#2563eb' }}
+                      style={{ backgroundColor: '#8F5A1D' }}
                       className="text-white px-4 py-2 rounded-lg text-xs font-bold hover:opacity-90 transition"
                     >
                       Save Address
@@ -353,7 +353,7 @@ export default function StoreCheckout() {
                     <button
                       type="button"
                       onClick={savePhone}
-                      style={{ backgroundColor: '#2563eb' }}
+                      style={{ backgroundColor: '#8F5A1D' }}
                       className="text-white px-4 py-2 rounded-lg text-xs font-bold hover:opacity-90 transition"
                     >
                       Save Phone
@@ -488,7 +488,7 @@ export default function StoreCheckout() {
             type="submit"
             form="checkout-form"
             disabled={loading || items.length === 0}
-            style={{ backgroundColor: '#2563eb' }}
+            style={{ backgroundColor: '#8F5A1D' }}
             className="w-full text-white py-3 rounded-xl font-bold text-xs tracking-wider hover:opacity-90 transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="animate-spin" size={16} />}

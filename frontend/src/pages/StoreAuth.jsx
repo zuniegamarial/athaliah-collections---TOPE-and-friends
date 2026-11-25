@@ -196,7 +196,7 @@ export default function StoreAuth() {
 
               <button
                 type="submit"
-                style={{ backgroundColor: '#2563eb' }}
+                style={{ backgroundColor: '#8F5A1D' }}
                 className="w-full py-3.5 mt-2 text-white font-bold rounded-xl shadow-lg hover:opacity-90 transition tracking-wide text-xs"
               >
                 SIGN IN
@@ -309,7 +309,7 @@ export default function StoreAuth() {
 
               <button
                 type="submit"
-                style={{ backgroundColor: '#2563eb' }}
+                style={{ backgroundColor: '#8F5A1D' }}
                 className="w-full py-3 mt-1 text-white font-bold rounded-xl shadow-lg hover:opacity-90 transition tracking-wide text-xs"
               >
                 SIGN UP

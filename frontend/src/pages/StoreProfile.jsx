@@ -100,7 +100,7 @@ export default function StoreProfile() {
     return (
       <div className="max-w-md mx-auto mt-10 bg-slate-800 border border-slate-700 rounded-2xl p-8 text-center space-y-4">
         <p className="text-white font-semibold">Please sign in to view your profile.</p>
-        <Link to="/store-auth" style={{ backgroundColor: '#2563eb' }} className="inline-block text-white px-6 py-3 rounded-xl text-xs font-bold tracking-wider">
+        <Link to="/store-auth" style={{ backgroundColor: '#8F5A1D' }} className="inline-block text-white px-6 py-3 rounded-xl text-xs font-bold tracking-wider">
           SIGN IN
         </Link>
       </div>
@@ -249,7 +249,7 @@ export default function StoreProfile() {
                   className={inputClass}
                 />
                 <div className="flex gap-2">
-                  <button onClick={saveAddress} style={{ backgroundColor: '#2563eb' }} className="text-white px-4 py-2 rounded-lg text-xs font-bold hover:opacity-90 transition">
+                  <button onClick={saveAddress} style={{ backgroundColor: '#8F5A1D' }} className="text-white px-4 py-2 rounded-lg text-xs font-bold hover:opacity-90 transition">
                     Save Address
                   </button>
                   <button onClick={() => { setAddingAddress(false); setNewAddress('') }} className="text-slate-300 px-3 py-2 text-xs hover:underline">

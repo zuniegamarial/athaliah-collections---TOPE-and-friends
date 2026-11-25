@@ -48,7 +48,7 @@ export default function StoreCatalog() {
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
           <button 
             onClick={() => setSelectedCategory('')}
-            style={selectedCategory === '' ? { backgroundColor: '#2563eb' } : {}}
+            style={selectedCategory === '' ? { backgroundColor: '#8F5A1D' } : {}}
             className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${selectedCategory === '' ? 'text-white shadow-sm' : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'}`}
           >
             All Items
@@ -57,7 +57,7 @@ export default function StoreCatalog() {
             <button 
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              style={selectedCategory === cat.id ? { backgroundColor: '#2563eb' } : {}}
+              style={selectedCategory === cat.id ? { backgroundColor: '#8F5A1D' } : {}}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${selectedCategory === cat.id ? 'text-white shadow-sm' : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'}`}
             >
               {cat.name} ({cat.product_count || 0})
@@ -104,7 +104,7 @@ export default function StoreCatalog() {
                 <button 
                   onClick={() => handleBuyNow(item)}
                   disabled={item.stock <= 0}
-                  style={{ backgroundColor: '#2563eb' }}
+                  style={{ backgroundColor: '#8F5A1D' }}
                   className="w-full text-white py-2 rounded-xl text-[11px] sm:text-xs font-semibold hover:opacity-90 transition shadow-sm disabled:opacity-50"
                 >
                   Buy Now

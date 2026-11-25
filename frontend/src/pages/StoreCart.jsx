@@ -41,7 +41,7 @@ export default function StoreCart() {
           </div>
           <button
             onClick={() => navigate('/store')}
-            style={{ backgroundColor: '#2563eb' }}
+            style={{ backgroundColor: '#8F5A1D' }}
             className="px-6 py-2.5 text-white rounded-xl text-xs font-semibold hover:opacity-90 transition shadow-sm inline-flex items-center gap-2"
           >
             Start Shopping <ArrowRight size={14} />
@@ -133,7 +133,7 @@ export default function StoreCart() {
 
             <button
               onClick={goToCheckout}
-              style={{ backgroundColor: '#2563eb' }}
+              style={{ backgroundColor: '#8F5A1D' }}
               className="w-full text-white py-3 rounded-xl text-xs font-semibold hover:opacity-90 transition shadow-sm flex items-center justify-center gap-2"
             >
               Proceed to Checkout <ArrowRight size={14} />

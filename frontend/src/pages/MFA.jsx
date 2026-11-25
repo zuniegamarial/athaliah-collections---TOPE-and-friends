@@ -253,7 +253,7 @@ export default function MFA() {
 
                       <button
                         type="submit"
-                        style={{ backgroundColor: '#2563eb' }}
+                        style={{ backgroundColor: '#8F5A1D' }}
                         className="flex w-full items-center justify-center gap-3 rounded-xl py-3.5 text-xs font-bold tracking-[0.18em] text-white shadow-lg transition hover:opacity-90"
                       >
                         VERIFY AND CONTINUE

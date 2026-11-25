@@ -12,3 +12,7 @@ frontend/dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local backups and browser automation data
+backups/
+.playwright-mcp/

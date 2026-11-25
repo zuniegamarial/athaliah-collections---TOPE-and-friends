@@ -29,8 +29,8 @@ def init_db():
     CREATE TABLE IF NOT EXISTS user_preferences (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER UNIQUE NOT NULL,
-        background_color TEXT NOT NULL DEFAULT '#0f172a',
-        accent_color TEXT NOT NULL DEFAULT '#6366f1',
+        background_color TEXT NOT NULL DEFAULT '#F7F3EC',
+        accent_color TEXT NOT NULL DEFAULT '#8A5A1C',
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 

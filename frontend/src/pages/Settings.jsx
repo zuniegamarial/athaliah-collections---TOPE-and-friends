@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useNavigate } from 'react-router-dom'
 
-const DEFAULT_BACKGROUND = '#f7f5f0'
-const DEFAULT_ACCENT = '#a18b69'
+const DEFAULT_BACKGROUND = '#F7F3EC'
+const DEFAULT_ACCENT = '#8A5A1C'
 
 export default function Settings() {
   const [backgroundColor, setBackgroundColor] = useState(DEFAULT_BACKGROUND)

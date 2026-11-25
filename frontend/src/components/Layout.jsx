@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { NavLink, Link, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Package,
@@ -50,8 +50,8 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [backgroundColor, setBackgroundColor] = useState('#f7f5f0')
-  const [accentColor, setAccentColor] = useState('#a18b69')
+  const [backgroundColor, setBackgroundColor] = useState('#F7F3EC')
+  const [accentColor, setAccentColor] = useState('#8A5A1C')
 
   useEffect(() => {
     let active = true
@@ -61,8 +61,8 @@ export default function Layout() {
         const preferences = await api.preferences()
 
         if (active) {
-          setBackgroundColor(preferences.background_color || '#f7f5f0')
-          setAccentColor(preferences.accent_color || '#a18b69')
+          setBackgroundColor(preferences.background_color || '#F7F3EC')
+          setAccentColor(preferences.accent_color || '#8A5A1C')
         }
       } catch (error) {
         console.error('Unable to load theme preferences:', error)
@@ -77,8 +77,8 @@ export default function Layout() {
   }, [location.pathname])
 
   const dark = isDarkColor(backgroundColor)
-  const textColor = dark ? '#F1F5F9' : '#292725'
-  const mutedColor = dark ? '#CBD5E1' : '#8B7663'
+  const textColor = dark ? '#F3ECE0' : '#211A14'
+  const mutedColor = dark ? '#D2C2AA' : '#6E5C48'
 
   useEffect(() => {
     const root = document.documentElement.style
@@ -89,11 +89,11 @@ export default function Layout() {
 
     // Cards / tables / inputs follow the theme (dark panels on a dark background)
     root.setProperty('--panel-bg', dark ? mix(backgroundColor, '#ffffff', 0.07) : '#ffffff')
-    root.setProperty('--panel-head', dark ? mix(backgroundColor, '#ffffff', 0.035) : `${accentColor}18`)
-    root.setProperty('--panel-head-text', dark ? '#CBD5E1' : accentColor)
-    root.setProperty('--panel-border', dark ? mix(backgroundColor, '#ffffff', 0.16) : `${accentColor}66`)
-    root.setProperty('--panel-text', dark ? '#F1F5F9' : '#292725')
-    root.setProperty('--panel-muted', dark ? '#94A3B8' : '#8B7663')
+    root.setProperty('--panel-head', dark ? mix(backgroundColor, '#ffffff', 0.035) : `${accentColor}14`)
+    root.setProperty('--panel-head-text', dark ? '#D2C2AA' : accentColor)
+    root.setProperty('--panel-border', dark ? mix(backgroundColor, '#ffffff', 0.16) : `${accentColor}40`)
+    root.setProperty('--panel-text', dark ? '#F3ECE0' : '#211A14')
+    root.setProperty('--panel-muted', dark ? '#B3A087' : '#6E5C48')
     root.setProperty('--input-bg', dark ? mix(backgroundColor, '#000000', 0.25) : '#ffffff')
   }, [backgroundColor, accentColor, textColor, mutedColor, dark])
 
@@ -113,37 +113,25 @@ export default function Layout() {
       data-app-dark={dark ? 'true' : 'false'}
       style={{ backgroundColor, color: textColor }}
     >
-      {/* FIXED SIDEBAR: Sticks to the left and takes full viewport height */}
-      <aside
-        className="flex h-screen w-64 flex-col border-r sticky top-0 shrink-0"
-        style={{
-          backgroundColor: `${accentColor}20`,
-          borderColor: accentColor,
-        }}
-      >
-        <header
-          className="border-b px-5 py-6"
-          style={{ borderColor: accentColor }}
-        >
-          <h1 className="text-lg font-semibold tracking-[0.08em]">
+      {/* FIXED SIDEBAR */}
+      <aside className="flex h-screen w-64 flex-col border-r sticky top-0 shrink-0 bg-[#211A14] text-slate-100">
+        <header className="border-b border-white/10 px-5 py-6">
+          <h1 className="font-display text-xl tracking-[0.1em] text-slate-50">
             ATHALIAH
           </h1>
 
-          <p className="text-xs font-light tracking-[0.16em]">
-            COLLECTIONS
+          <p className="font-display text-xs italic tracking-[0.08em] text-brass-300">
+            Collections
           </p>
 
-          <p className="mt-3 text-xs" style={{ color: accentColor }}>
-            ADMIN PORTAL
+          <p className="mt-4 text-[10px] uppercase tracking-[0.24em] text-brass-400">
+            Admin portal
           </p>
         </header>
 
         <nav aria-label="Main navigation" className="flex-1 overflow-y-auto p-3">
-          <p
-            className="mb-3 px-3 pt-3 text-[10px] font-semibold tracking-[0.2em]"
-            style={{ color: accentColor }}
-          >
-            MAIN MENU
+          <p className="mb-3 px-3 pt-3 text-[10px] uppercase tracking-[0.22em] text-slate-500">
+            Main menu
           </p>
 
           <ul className="space-y-1">
@@ -152,17 +140,14 @@ export default function Layout() {
                 <NavLink
                   to={to}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded px-3 py-3 text-sm transition ${
+                    `flex items-center gap-3 px-3 py-2.5 text-[13px] transition ${
                       isActive
-                        ? 'font-medium text-white'
-                        : 'hover:bg-white/10'
+                        ? 'bg-brass-400 text-slate-950'
+                        : 'text-slate-300 hover:bg-white/5 hover:text-white'
                     }`
                   }
-                  style={({ isActive }) =>
-                    isActive ? { backgroundColor: accentColor } : { color: textColor }
-                  }
                 >
-                  <Icon size={18} />
+                  <Icon size={17} />
                   {label}
                 </NavLink>
               </li>
@@ -170,16 +155,12 @@ export default function Layout() {
           </ul>
         </nav>
 
-        <div
-          className="border-t p-3 mt-auto"
-          style={{ borderColor: accentColor }}
-        >
+        <div className="border-t border-white/10 p-3">
           <button
             onClick={logout}
-            className="flex w-full items-center gap-3 rounded px-3 py-3 text-sm transition hover:bg-white/10"
-            style={{ color: accentColor }}
+            className="flex w-full items-center gap-3 px-3 py-2.5 text-[13px] text-slate-400 transition hover:bg-white/5 hover:text-brass-300"
           >
-            <LogOut size={18} />
+            <LogOut size={17} />
             Logout
           </button>
         </div>
@@ -190,24 +171,30 @@ export default function Layout() {
         {/* FIXED TOP HEADER */}
         <header
           className="flex items-center justify-between border-b px-6 py-4 sticky top-0 z-10 shrink-0 transition-colors duration-300"
-          style={{
-            backgroundColor: `${accentColor}20`,
-            borderColor: accentColor,
-          }}
+          style={{ borderColor: `${accentColor}40` }}
         >
           <div>
-            <h2 className="text-base font-semibold tracking-wide">
+            <h2 className="font-display text-base tracking-wide">
               Athaliah Collections
             </h2>
 
-            <p className="mt-1 text-xs" style={{ color: accentColor }}>
-              Store Management System
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.2em]" style={{ color: accentColor }}>
+              Store management
             </p>
           </div>
 
-          <span className="text-xs tracking-wide" style={{ color: accentColor }}>
-            Legazpi City, Albay
-          </span>
+          <div className="flex items-center gap-5">
+            <span className="hidden text-xs sm:block" style={{ color: mutedColor }}>
+              Legazpi City, Albay
+            </span>
+            <Link
+              to="/store"
+              className="border px-3 py-2 text-[10px] uppercase tracking-[0.18em] transition hover:opacity-80"
+              style={{ borderColor: accentColor, color: accentColor }}
+            >
+              Storefront
+            </Link>
+          </div>
         </header>
 
         {/* SCROLLABLE MAIN CONTENT AREA */}

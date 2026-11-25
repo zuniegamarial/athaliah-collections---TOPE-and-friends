@@ -92,51 +92,55 @@ export default function Categories() {
     }
   }
 
+  const accent = 'var(--app-accent, #8A5A1C)'
+  const panel = { backgroundColor: 'white', borderColor: `${accent}40` }
+
   return (
-    <div className="space-y-8 text-slate-100">
+    <div className="space-y-8">
       <div className="mx-auto max-w-6xl space-y-8">
 
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-6" style={{ borderColor: `${accent}30` }}>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400">
-              Product Management
+            <p className="text-xs font-medium uppercase tracking-[0.2em]" style={{ color: accent }}>
+              Product management
             </p>
-            <h1 className="mt-2 text-3xl font-light text-white tracking-wide">
+            <h1 className="mt-2 font-display text-3xl font-normal tracking-wide text-[#211A14]">
               Categories
             </h1>
-            <p className="mt-1 text-sm text-slate-300">
+            <p className="mt-1 text-sm text-[#6E5C48]">
               Organize your products into categories.
             </p>
           </div>
 
           <button
             onClick={openAddForm}
-            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-indigo-700 transition shadow-lg"
+            className="flex items-center gap-2 px-5 py-3 text-[11px] uppercase tracking-[0.16em] text-white transition hover:opacity-85"
+            style={{ backgroundColor: accent }}
           >
-            <Plus size={17} />
-            Add Category
+            <Plus size={16} />
+            Add category
           </button>
         </div>
 
         {error && !showForm && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
+          <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {error}
           </div>
         )}
 
         {/* Metric Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-xl">
-            <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Categories</p>
-            <p className="mt-3 text-4xl font-bold text-white">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border p-6 shadow-sm" style={panel}>
+            <p className="text-xs uppercase tracking-wider font-medium" style={{ color: accent }}>Total categories</p>
+            <p className="mt-3 font-display text-4xl text-[#211A14]">
               {categories.length}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-xl">
-            <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Products Organized</p>
-            <p className="mt-3 text-4xl font-bold text-white">
+          <div className="rounded-xl border p-6 shadow-sm" style={panel}>
+            <p className="text-xs uppercase tracking-wider font-medium" style={{ color: accent }}>Products organized</p>
+            <p className="mt-3 font-display text-4xl text-[#211A14]">
               {categories.reduce(
                 (total, category) => total + (category.product_count || 0),
                 0
@@ -145,25 +149,26 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* Form Modal */}
+        {/* Form */}
         {showForm && (
-          <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between border-b border-slate-700 pb-4">
-              <h2 className="text-lg font-bold text-white">
-                {editingId ? 'Edit Category' : 'Add New Category'}
+          <div className="rounded-xl border p-6 shadow-sm" style={panel}>
+            <div className="mb-5 flex items-center justify-between border-b pb-4" style={{ borderColor: `${accent}30` }}>
+              <h2 className="font-display text-lg text-[#211A14]">
+                {editingId ? 'Edit category' : 'Add new category'}
               </h2>
               <button
                 onClick={() => setShowForm(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-700 transition"
+                className="rounded p-2 text-[#6E5C48] transition hover:bg-[#211A14]/5"
+                aria-label="Close form"
               >
-                <X size={19} />
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-2 block text-xs font-medium tracking-wider text-slate-300">
-                  CATEGORY NAME *
+                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-[#4F4336]">
+                  Category name *
                 </label>
                 <input
                   type="text"
@@ -171,15 +176,15 @@ export default function Categories() {
                   onChange={(e) =>
                     setForm({ ...form, name: e.target.value })
                   }
-                  placeholder="e.g. Skincare"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-indigo-500"
+                  placeholder="e.g. Footwear"
+                  className="w-full rounded border border-[#D2C2AA] bg-white px-4 py-3 text-sm text-[#211A14] outline-none transition focus:border-[#8A5A1C]"
                   required
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-xs font-medium tracking-wider text-slate-300">
-                  DESCRIPTION
+                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-[#4F4336]">
+                  Description
                 </label>
                 <textarea
                   value={form.description}
@@ -188,31 +193,32 @@ export default function Categories() {
                   }
                   placeholder="Describe this category..."
                   rows="3"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-indigo-500"
+                  className="w-full rounded border border-[#D2C2AA] bg-white px-4 py-3 text-sm text-[#211A14] outline-none transition focus:border-[#8A5A1C]"
                 />
               </div>
 
               {error && (
-                <p className="text-xs text-red-400">{error}</p>
+                <p className="text-xs text-red-700">{error}</p>
               )}
 
               <div className="flex flex-wrap gap-3 pt-2">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-indigo-700 disabled:opacity-50 transition shadow-lg"
+                  className="rounded px-5 py-3 text-[11px] uppercase tracking-[0.16em] text-white transition hover:opacity-85 disabled:opacity-50"
+                  style={{ backgroundColor: accent }}
                 >
                   {saving
                     ? 'Saving...'
                     : editingId
-                      ? 'Save Changes'
-                      : 'Create Category'}
+                      ? 'Save changes'
+                      : 'Create category'}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="rounded-xl border border-slate-700 px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-300 hover:bg-slate-700 transition"
+                  className="rounded border border-[#D2C2AA] px-5 py-3 text-[11px] uppercase tracking-[0.16em] text-[#4F4336] transition hover:bg-[#211A14]/5"
                 >
                   Cancel
                 </button>
@@ -221,51 +227,54 @@ export default function Categories() {
           </div>
         )}
 
-        {/* Categories List Container */}
-        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-xl">
-          <div className="border-b border-slate-700 px-6 py-5 bg-slate-850">
-            <h2 className="font-semibold text-white">
-              All Categories
+        {/* Categories list */}
+        <div className="overflow-hidden rounded-xl border shadow-sm" style={panel}>
+          <div className="border-b px-6 py-4" style={{ borderColor: `${accent}30`, backgroundColor: `${accent}0F` }}>
+            <h2 className="font-display text-base text-[#211A14]">
+              All categories
             </h2>
           </div>
 
           {loading ? (
-            <div className="p-10 text-center text-sm text-slate-400">
+            <div className="p-10 text-center text-sm text-[#6E5C48]">
               Loading categories...
             </div>
           ) : categories.length === 0 ? (
             <div className="p-12 text-center">
               <FolderTree
-                size={36}
-                className="mx-auto mb-3 text-slate-500"
+                size={32}
+                className="mx-auto mb-3 text-[#B3A087]"
               />
-              <h3 className="font-medium text-white">
+              <h3 className="font-display text-lg text-[#211A14]">
                 No categories yet
               </h3>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-[#6E5C48]">
                 Add your first category to organize your products.
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-700">
+            <div className="divide-y divide-[#E6DBC9]">
               {categories.order_date ? null : categories.map((category) => (
                 <div
                   key={category.id}
-                  className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 hover:bg-slate-750 transition"
+                  className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 transition hover:bg-[#211A14]/[0.02]"
                 >
                   <div className="flex min-w-0 items-center gap-4">
-                    <div className="rounded-xl bg-slate-900 border border-slate-700 p-3 text-indigo-400">
-                      <FolderTree size={20} />
+                    <div
+                      className="rounded border p-3"
+                      style={{ borderColor: `${accent}40`, backgroundColor: `${accent}12`, color: accent }}
+                    >
+                      <FolderTree size={18} />
                     </div>
 
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-white">
+                      <h3 className="font-display text-base text-[#211A14]">
                         {category.name}
                       </h3>
-                      <p className="mt-0.5 text-sm text-slate-300">
+                      <p className="mt-0.5 text-sm text-[#6E5C48]">
                         {category.description || 'No description'}
                       </p>
-                      <p className="mt-1 text-xs text-indigo-400 font-medium">
+                      <p className="mt-1 text-xs font-medium" style={{ color: accent }}>
                         {category.product_count || 0} products
                       </p>
                     </div>
@@ -275,17 +284,17 @@ export default function Categories() {
                     <button
                       onClick={() => openEditForm(category)}
                       title="Edit category"
-                      className="rounded-xl border border-slate-700 bg-slate-900 p-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition"
+                      className="rounded border border-[#D2C2AA] p-2.5 text-[#6E5C48] transition hover:border-[#8A5A1C] hover:text-[#8A5A1C]"
                     >
-                      <Pencil size={16} />
+                      <Pencil size={15} />
                     </button>
 
                     <button
                       onClick={() => handleDelete(category)}
                       title="Delete category"
-                      className="rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-red-400 hover:bg-red-500/20 transition"
+                      className="rounded border border-red-200 bg-red-50 p-2.5 text-red-700 transition hover:bg-red-100"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
