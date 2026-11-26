@@ -93,6 +93,8 @@ def init_db():
         order_status TEXT NOT NULL DEFAULT 'Pending',
         tracking_number TEXT,
         shipping_label_generated INTEGER DEFAULT 0,
+        destination_lat REAL,
+        destination_lng REAL,
         items TEXT,
         FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
     );
@@ -112,9 +114,28 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer_id INTEGER NOT NULL,
         address TEXT NOT NULL,
+        latitude REAL,
+        longitude REAL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS order_location_pings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        shared_by INTEGER,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        accuracy REAL,
+        heading REAL,
+        speed REAL,
+        recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (shared_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_order_location_pings_order_id
+        ON order_location_pings(order_id, id DESC);
     """)
 
     # Seed Admin Account
@@ -175,6 +196,10 @@ def init_db():
     ensure_column("orders", "payment_reference", "TEXT")
     ensure_column("orders", "shipping_address", "TEXT")
     ensure_column("orders", "contact_phone", "TEXT")
+    ensure_column("orders", "destination_lat", "REAL")
+    ensure_column("orders", "destination_lng", "REAL")
+    ensure_column("customer_addresses", "latitude", "REAL")
+    ensure_column("customer_addresses", "longitude", "REAL")
 
     version = cur.execute("PRAGMA user_version").fetchone()[0]
     if version < 1:

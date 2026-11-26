@@ -57,16 +57,28 @@ export const api = {
     method: 'PUT',
     body: JSON.stringify({ status }),
   }),
+  orderLocation: (id) => request(`/api/orders/${id}/location`),
+  orderRoute: (id) => request(`/api/orders/${id}/route`),
+  shareOrderLocation: (id, location) => request(`/api/orders/${id}/location`, {
+    method: 'POST',
+    body: JSON.stringify(location),
+  }),
 
   customers: () => request('/api/customers'),
   createCustomer: (b) => request('/api/customers', { method: 'POST', body: JSON.stringify(b) }),
 
   storeOrders: () => request('/api/store/orders'),
+  storeOrderLocation: (id) => request(`/api/store/orders/${id}/location`),
+  storeOrderRoute: (id) => request(`/api/store/orders/${id}/route`),
   cancelStoreOrder: (id) => request(`/api/store/orders/${id}/cancel`, { method: 'POST' }),
   profile: () => request('/api/profile'),
   updateProfile: (b) => request('/api/profile', { method: 'PUT', body: JSON.stringify(b) }),
-  addAddress: (address) => request('/api/profile/addresses', { method: 'POST', body: JSON.stringify({ address }) }),
+  addAddress: (address, latitude, longitude) => request('/api/profile/addresses', {
+    method: 'POST',
+    body: JSON.stringify({ address, latitude, longitude }),
+  }),
   deleteAddress: (id) => request(`/api/profile/addresses/${id}`, { method: 'DELETE' }),
+  reverseGeocode: (lat, lng) => request(`/api/geocode/reverse?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`),
   categories: () => request('/api/categories'),
   preferences: () => request('/api/preferences'),
   updatePreferences: (b) => request('/api/preferences', {

@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import {
-  CheckCircle2, ArrowLeft, MapPin, Phone, CreditCard, Plus, QrCode, Loader2, ShoppingBag,
+  CheckCircle2, Check, Copy, Receipt, Package, ArrowLeft, MapPin, Phone, CreditCard, Plus, QrCode, Loader2, ShoppingBag,
 } from 'lucide-react'
 import { useCart } from '../context/CartContext'
 import { api } from '../api'
+import LocationPicker from '../components/LocationPicker'
+import { STORE_LOCATION } from '../config'
 
 const peso = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+const buttonClass =
+  'inline-flex items-center justify-center whitespace-nowrap min-h-[40px] sm:min-h-[44px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-xl font-semibold transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]'
 
 const inputClass =
   'w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition'
@@ -44,6 +49,8 @@ export default function StoreCheckout() {
   const [selectedAddressId, setSelectedAddressId] = useState(null)
   const [addingAddress, setAddingAddress] = useState(false)
   const [newAddress, setNewAddress] = useState('')
+  const [deliveryPin, setDeliveryPin] = useState(null)
+  const [locating, setLocating] = useState(false)
   
   // Phone selection state
   const [phones, setPhones] = useState([])
@@ -68,11 +75,21 @@ export default function StoreCheckout() {
       .catch(err => { if ((err.status === 401 || err.status === 403)) setNeedsLogin(true) })
   }, [])
 
+  useEffect(() => {
+    const address = addresses.find(a => a.id === selectedAddressId)
+    if (address?.latitude != null && address?.longitude != null) {
+      setDeliveryPin([address.latitude, address.longitude])
+    } else {
+      setDeliveryPin(null)
+    }
+  }, [selectedAddressId, profile])
+
   const [paymentMethod, setPaymentMethod] = useState('COD')
   const [paymentReference, setPaymentReference] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [placed, setPlaced] = useState(null)
+  const [copied, setCopied] = useState(false)
 
   const addresses = profile?.addresses || []
   const selectedAddress = addresses.find(a => a.id === selectedAddressId)?.address || ''
@@ -80,8 +97,9 @@ export default function StoreCheckout() {
   const saveAddress = async () => {
     setErrorMsg('')
     if (!newAddress.trim()) return setErrorMsg('Please enter a valid address.')
+    if (!deliveryPin) return setErrorMsg('Drop the customer pin on the map first.')
     try {
-      const updated = await api.addAddress(newAddress)
+      const updated = await api.addAddress(newAddress, deliveryPin[0], deliveryPin[1])
       setProfile(updated)
       setSelectedAddressId(updated.addresses[updated.addresses.length - 1].id)
       setNewAddress('')
@@ -89,6 +107,35 @@ export default function StoreCheckout() {
     } catch (err) {
       setErrorMsg(err.message)
     }
+  }
+
+  const useCurrentLocation = () => {
+    setErrorMsg('')
+    if (!navigator.geolocation) {
+      setErrorMsg('Geolocation is not available in this browser.')
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const pin = [Number(coords.latitude), Number(coords.longitude)]
+        setDeliveryPin(pin)
+        let address = `Current location (${pin[0].toFixed(5)}, ${pin[1].toFixed(5)})`
+        try {
+          const geo = await api.reverseGeocode(pin[0], pin[1])
+          address = geo.address || address
+        } catch {
+          setErrorMsg('Address lookup was unavailable. Review the pin and address before saving.')
+        }
+        setNewAddress(address)
+        setLocating(false)
+      },
+      () => {
+        setLocating(false)
+        setErrorMsg('Could not get your current location. Allow location access and try again.')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
   }
 
   const savePhone = async () => {
@@ -116,6 +163,7 @@ export default function StoreCheckout() {
 
     if (items.length === 0) return setErrorMsg('There are no items to check out.')
     if (!selectedAddress) return setErrorMsg('Please add and select a shipping address.')
+    if (!deliveryPin) return setErrorMsg('Drop the customer pin on the map first.')
     if (!isValidPhone(selectedPhone)) return setErrorMsg('Enter a valid mobile number, for example 09123456789.')
     if (paymentMethod !== 'COD' && !paymentReference.trim()) {
       return setErrorMsg(`Enter your ${paymentMethod} reference number.`)
@@ -123,17 +171,20 @@ export default function StoreCheckout() {
 
     setLoading(true)
     try {
+      const orderItems = items.map(i => ({
+        product_id: i.id || i.product_id,
+        product_name: i.name || i.product_name || 'Athaliah item',
+        quantity: i.quantity || 1,
+        price: i.price || 0,
+      }))
       const res = await api.createOrder({
         payment_method: paymentMethod,
         payment_reference: paymentReference.trim(),
         shipping_address: selectedAddress,
+        destination_lat: deliveryPin[0],
+        destination_lng: deliveryPin[1],
         contact_phone: selectedPhone.trim(),
-        items: items.map(i => ({
-          product_id: i.id || i.product_id,
-          product_name: i.name || i.product_name,
-          quantity: i.quantity || 1,
-          price: i.price,
-        })),
+        items: orderItems,
       })
 
       if (usingBuyNow) {
@@ -144,7 +195,17 @@ export default function StoreCheckout() {
         clearCart()
         clearBuyNow()
       }
-      setPlaced({ orderNumber: res.order_number, total: res.total ?? subtotal, method: paymentMethod, reference: paymentReference.trim() })
+      setPlaced({
+        orderNumber: res.order_number,
+        total: res.total ?? subtotal,
+        method: paymentMethod,
+        reference: paymentReference.trim(),
+        address: selectedAddress,
+        items: orderItems,
+        placedAt: new Date().toLocaleString('en-PH', {
+          year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+        }),
+      })
     } catch (err) {
       if ((err.status === 401 || err.status === 403)) setNeedsLogin(true)
       setErrorMsg(
@@ -157,44 +218,147 @@ export default function StoreCheckout() {
     }
   }
 
+  const copyOrderNumber = async () => {
+    if (!placed?.orderNumber) return
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(placed.orderNumber)
+      } else {
+        const field = document.createElement('textarea')
+        field.value = placed.orderNumber
+        field.style.position = 'fixed'
+        field.style.opacity = '0'
+        document.body.appendChild(field)
+        field.select()
+        document.execCommand('copy')
+        document.body.removeChild(field)
+      }
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setCopied(false)
+    }
+  }
+
   /* ---------------- success screen ---------------- */
   if (placed) {
+    const receiptItems = Array.isArray(placed.items) ? placed.items : []
+    const totalQty = receiptItems.reduce((n, i) => n + (i.quantity || 1), 0)
+
     return (
-      <div className="max-w-md mx-auto mt-10 bg-slate-800 border border-slate-700 rounded-3xl shadow-2xl p-8 text-center space-y-5">
-        <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-          <CheckCircle2 size={44} />
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-indigo-400 font-bold">Thank you</p>
-          <h2 className="text-2xl font-extrabold text-white mt-2">Order Placed Successfully!</h2>
-          <p className="text-sm text-slate-300 mt-3 leading-relaxed">
-            Your order is now <span className="font-bold text-amber-400">Pending</span> review by the admin.
-          </p>
-        </div>
+      <div className="w-full max-w-full min-w-0 space-y-4 pb-12">
+        <div className="mx-auto w-full max-w-2xl min-w-0 space-y-5 pt-8 sm:pt-10">
+          <div className="overflow-hidden rounded-3xl border border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900 shadow-2xl">
+            <div className="border-b border-dashed border-slate-700 bg-slate-800/60 px-5 pb-7 pt-8 text-center sm:px-6">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_0_6px_rgba(16,185,129,0.05)]">
+                <CheckCircle2 size={38} strokeWidth={2.2} />
+              </div>
+              <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.28em] text-amber-300">Order confirmed</p>
+              <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Order Placed Successfully!</h2>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                Your order is now <span className="font-bold text-amber-400">Pending</span> review by the admin.
+              </p>
+            </div>
 
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-2 text-sm text-left">
-          <div className="flex justify-between"><span className="text-slate-400">Order number</span><span className="font-mono font-bold text-indigo-300">{placed.orderNumber}</span></div>
-          <div className="flex justify-between"><span className="text-slate-400">Payment</span><span className="font-semibold text-white">{placed.method}</span></div>
-          {placed.method !== 'COD' && placed.reference && (
-            <div className="flex justify-between"><span className="text-slate-400">Reference no.</span><span className="font-semibold text-white">{placed.reference}</span></div>
-          )}
-          <div className="flex justify-between border-t border-slate-700 pt-2"><span className="text-slate-400">Total</span><span className="font-bold text-blue-400">{peso(placed.total)}</span></div>
-        </div>
+            <div className="space-y-5 p-4 sm:p-8">
+              <div className="rounded-2xl border border-slate-700 bg-slate-950/50 shadow-inner">
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-700/70 px-4 py-4 sm:px-5">
+                  <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                    <Receipt size={15} className="shrink-0 text-amber-400" /> Order receipt
+                  </p>
+                  <span className="break-words text-[10px] text-slate-500">{placed.placedAt}</span>
+                </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => navigate('/store/orders')}
-            style={{ backgroundColor: '#8F5A1D' }}
-            className="flex-1 text-white py-3 rounded-xl text-xs font-bold tracking-wider hover:opacity-90 transition"
-          >
-            View My Orders
-          </button>
-          <button
-            onClick={() => navigate('/store')}
-            className="flex-1 bg-slate-900 border border-slate-700 text-slate-200 py-3 rounded-xl text-xs font-semibold hover:bg-slate-700 transition"
-          >
-            Continue Shopping
-          </button>
+                <div className="space-y-5 px-4 py-5 sm:px-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-dashed border-slate-700 pb-5">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Order number</p>
+                      <p className="mt-1 break-all font-mono text-lg font-extrabold tracking-wide text-amber-300">{placed.orderNumber}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={copyOrderNumber}
+                      className={`${buttonClass} w-full gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:border-amber-500/60 hover:bg-amber-500/10 hover:text-white sm:w-auto`}
+                    >
+                      {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="min-w-0 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                        <MapPin size={12} className="shrink-0 text-emerald-400" /> Delivery address
+                      </p>
+                      <p className="mt-2 break-words text-sm leading-relaxed text-slate-200">{placed.address || '—'}</p>
+                    </div>
+                    <div className="min-w-0 space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs">
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <span className="text-slate-500">Payment</span>
+                        <span className="break-words font-semibold text-white">{placed.method}</span>
+                      </div>
+                      {placed.method !== 'COD' && placed.reference && (
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span className="text-slate-500">Reference</span>
+                          <span className="break-all font-semibold text-white">{placed.reference}</span>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <span className="text-slate-500">Items</span>
+                        <span className="font-semibold text-white">{totalQty}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-dashed border-slate-700 pt-5">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                        <Package size={12} className="shrink-0 text-blue-400" /> Item summary
+                      </p>
+                      <span className="text-[11px] text-slate-500">{receiptItems.length} line(s)</span>
+                    </div>
+                    <div className="space-y-3">
+                      {receiptItems.map((item, idx) => (
+                        <div key={`${item.product_id ?? 'item'}-${idx}`} className="flex min-w-0 items-start justify-between gap-3 text-xs">
+                          <div className="flex min-w-0 items-start gap-2">
+                            <span className="mt-0.5 shrink-0 rounded-md border border-slate-700 bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-blue-300">{item.quantity}×</span>
+                            <p className="truncate text-slate-200" title={item.product_name}>{item.product_name}</p>
+                          </div>
+                          <p className="shrink-0 whitespace-nowrap font-semibold text-white">{peso(item.price * item.quantity)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-end justify-between gap-3 border-t border-dashed border-slate-700 pt-4">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Total due</p>
+                      <p className="mt-1 break-words text-[11px] text-slate-400">
+                        {placed.method === 'COD' ? 'Pay on delivery' : 'Payment verification pending'}
+                      </p>
+                    </div>
+                    <p className="shrink-0 whitespace-nowrap text-2xl font-extrabold text-blue-400">{peso(placed.total)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  onClick={() => navigate('/store/orders')}
+                  style={{ backgroundColor: '#8F5A1D' }}
+                  className={`${buttonClass} w-full font-bold tracking-wider text-white hover:brightness-110 hover:shadow-lg hover:shadow-amber-900/30`}
+                >
+                  View My Orders
+                </button>
+                <button
+                  onClick={() => navigate('/store')}
+                  className={`${buttonClass} w-full border border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500 hover:bg-slate-800 hover:text-white`}
+                >
+                  Continue Shopping
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -283,6 +447,15 @@ export default function StoreCheckout() {
                     onChange={e => setNewAddress(e.target.value)}
                     className={inputClass}
                   />
+                  <button
+                    type="button"
+                    onClick={useCurrentLocation}
+                    disabled={locating}
+                    className="flex items-center gap-1.5 text-xs text-indigo-300 font-semibold hover:underline disabled:opacity-50"
+                  >
+                    {locating ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
+                    {locating ? 'Getting your location...' : 'Use my current location'}
+                  </button>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -304,6 +477,18 @@ export default function StoreCheckout() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-2 pt-4 border-t border-slate-700">
+              <p className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                <MapPin size={14} className="text-emerald-400" /> Delivery Pin
+              </p>
+              <p className="text-[11px] text-slate-400">Store: {STORE_LOCATION.address}</p>
+              <LocationPicker
+                value={deliveryPin}
+                onChange={setDeliveryPin}
+                className="h-[240px] w-full sm:h-[280px] lg:h-[320px] rounded-xl overflow-hidden border border-slate-700"
+              />
             </div>
 
             {/* Contact Phone Number */}

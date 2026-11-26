@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { ClipboardList, Package, Clock, Truck, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { ClipboardList, Package, Clock, Truck, CheckCircle2, XCircle, Loader2, Navigation } from 'lucide-react'
 import { api } from '../api'
 
 const peso = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -153,6 +153,15 @@ export default function StoreOrders() {
                     <p>Payment: <span className="text-white font-semibold">{order.payment_method}</span> · {order.payment_status}</p>
                     {order.shipping_address && <p>Ship to: <span className="text-white">{order.shipping_address}</span></p>}
                     {order.tracking_number && <p>Tracking: <span className="text-white font-mono">{order.tracking_number}</span></p>}
+                    {order.live_location_at && <p className="text-blue-300">Live location shared {formatDate(order.live_location_at)}</p>}
+                    {order.order_status === 'Shipped' && order.destination_lat != null && (
+                      <Link
+                        to={`/store/orders/${order.id}/track`}
+                        className="inline-flex items-center gap-1 text-blue-300 font-semibold hover:underline"
+                      >
+                        <Navigation size={13} /> Track live location
+                      </Link>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     {order.order_status === 'Pending' && (

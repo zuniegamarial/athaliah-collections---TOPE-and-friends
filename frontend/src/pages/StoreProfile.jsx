@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   MapPin, Calendar, ShieldCheck, Phone, Fingerprint, ChevronDown, LogOut,
-  Package, Plus, Trash2, Pencil, Check, X,
+  Package, Plus, Trash2, Pencil, Check, X, Loader2,
 } from 'lucide-react'
 import { api } from '../api'
 import { useCart } from '../context/CartContext'
@@ -34,6 +34,8 @@ export default function StoreProfile() {
 
   const [addingAddress, setAddingAddress] = useState(false)
   const [newAddress, setNewAddress] = useState('')
+  const [newAddressPin, setNewAddressPin] = useState(null)
+  const [locating, setLocating] = useState(false)
   const [editingPhone, setEditingPhone] = useState(false)
   const [phone, setPhone] = useState('')
 
@@ -57,14 +59,47 @@ export default function StoreProfile() {
 
   const saveAddress = async () => {
     try {
-      const updated = await api.addAddress(newAddress)
+      const updated = await api.addAddress(
+        newAddress,
+        newAddressPin?.[0],
+        newAddressPin?.[1]
+      )
       setProfile(updated)
       setNewAddress('')
+      setNewAddressPin(null)
       setAddingAddress(false)
       flash('success', 'Address saved.')
     } catch (err) {
       flash('error', err.message)
     }
+  }
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      flash('error', 'Geolocation is not available in this browser.')
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const pin = [Number(coords.latitude), Number(coords.longitude)]
+        setNewAddressPin(pin)
+        let address = `Current location (${pin[0].toFixed(5)}, ${pin[1].toFixed(5)})`
+        try {
+          const geo = await api.reverseGeocode(pin[0], pin[1])
+          address = geo.address || address
+        } catch {
+          flash('error', 'Address lookup was unavailable. Review before saving.')
+        }
+        setNewAddress(address)
+        setLocating(false)
+      },
+      () => {
+        setLocating(false)
+        flash('error', 'Could not get your current location. Allow location access and try again.')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
   }
 
   const removeAddress = async (id) => {
@@ -248,11 +283,25 @@ export default function StoreProfile() {
                   placeholder="House no., street, barangay, city"
                   className={inputClass}
                 />
+                <button
+                  type="button"
+                  onClick={useCurrentLocation}
+                  disabled={locating}
+                  className="flex items-center gap-1 text-xs text-indigo-300 font-semibold hover:underline disabled:opacity-50"
+                >
+                  {locating ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
+                  {locating ? 'Getting your location...' : 'Use my current location'}
+                </button>
+                {newAddressPin && (
+                  <p className="text-[11px] text-emerald-300">
+                    Pin: {newAddressPin[0].toFixed(5)}, {newAddressPin[1].toFixed(5)}
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <button onClick={saveAddress} style={{ backgroundColor: '#8F5A1D' }} className="text-white px-4 py-2 rounded-lg text-xs font-bold hover:opacity-90 transition">
                     Save Address
                   </button>
-                  <button onClick={() => { setAddingAddress(false); setNewAddress('') }} className="text-slate-300 px-3 py-2 text-xs hover:underline">
+                  <button onClick={() => { setAddingAddress(false); setNewAddress(''); setNewAddressPin(null) }} className="text-slate-300 px-3 py-2 text-xs hover:underline">
                     Cancel
                   </button>
                 </div>

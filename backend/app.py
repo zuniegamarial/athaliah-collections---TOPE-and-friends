@@ -1,9 +1,12 @@
 from flask import Flask, request, jsonify, session as _flask_session
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 from flask_cors import CORS
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
 from database import get_db, init_db
+import json
+import math
 import os
 import sqlite3
 import re
@@ -70,6 +73,13 @@ app.config.update(
 CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.8.199:5173"])
 
 DEMO_OTP = "123456"
+
+STORE_LOCATION = {
+    "name": "Athaliah Collections",
+    "address": "Brgy. 28 Victory Village North, Legazpi City, Albay",
+    "latitude": 13.1441,
+    "longitude": 123.75583,
+}
 
 # ---------- DATABASE SEEDER FOR ADMIN ----------
 def seed_admin_accounts():
@@ -711,6 +721,75 @@ def update_inventory(vid):
     conn.close()
     return jsonify({"message": "Stock updated.", "stock": new_stock})
 
+# ---------- LOCATION HELPERS ----------
+def _location_number(value, label, minimum=None, maximum=None, optional=False):
+    if optional and value in (None, ""):
+        return None, None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None, f"{label} must be a number."
+    if not math.isfinite(number):
+        return None, f"{label} must be a number."
+    if minimum is not None and number < minimum:
+        return None, f"{label} must be at least {minimum}."
+    if maximum is not None and number > maximum:
+        return None, f"{label} must be at most {maximum}."
+    return number, None
+
+def row_value(row, key, default=None):
+    if row is None:
+        return default
+    return row[key] if key in row.keys() else default
+
+@app.route("/api/geocode/reverse", methods=["GET"])
+def reverse_geocode():
+    latitude, error = _location_number(request.args.get("lat"), "Latitude", -90, 90)
+    if error:
+        return jsonify({"error": error}), 400
+    longitude, error = _location_number(request.args.get("lng"), "Longitude", -180, 180)
+    if error:
+        return jsonify({"error": error}), 400
+
+    fallback_address = "Current location"
+    url = (
+        "https://api.bigdatacloud.net/data/reverse-geocode-client"
+        f"?latitude={latitude}&longitude={longitude}&localityLanguage=en"
+    )
+    try:
+        req = Request(url, headers={"User-Agent": "AthaliahCollections/1.0"})
+        with urlopen(req, timeout=6) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return jsonify({
+            "error": "Address lookup is temporarily unavailable.",
+            "address": fallback_address,
+            "city": "",
+            "province": "",
+        }), 502
+
+    administrative = (data.get("localityInfo") or {}).get("administrative") or []
+    province = next((item.get("name", "") for item in administrative if item.get("adminLevel") == 4), "")
+    city = data.get("city") or data.get("locality") or ""
+    barangay = next((
+        item.get("name", "") for item in administrative
+        if "barangay" in str(item.get("description") or "").lower()
+    ), "")
+    parts = []
+    for value in (barangay, city, province or data.get("principalSubdivision"), data.get("countryName")):
+        text = str(value or "").strip()
+        if text and text not in parts:
+            parts.append(text)
+    address = ", ".join(parts) if parts else str(data.get("address") or "").strip() or fallback_address
+    return jsonify({
+        "address": address,
+        "barangay": barangay,
+        "city": city,
+        "province": province,
+        "latitude": latitude,
+        "longitude": longitude,
+    })
+
 # ---------- ORDERS ----------
 ORDER_STATUSES = {"Pending", "Processing", "Shipped", "Delivered", "Cancelled", "Refunded"}
 
@@ -723,6 +802,14 @@ def create_order():
     contact_phone = (data.get("contact_phone") or "").strip()
     payment_method = data.get("payment_method") if data.get("payment_method") in ("COD", "GCash", "Maya") else "COD"
     payment_reference = (data.get("payment_reference") or "").strip()
+    destination_lat, error = _location_number(data.get("destination_lat"), "Delivery latitude", -90, 90, optional=True)
+    if error:
+        return jsonify({"success": False, "message": error}), 400
+    destination_lng, error = _location_number(data.get("destination_lng"), "Delivery longitude", -180, 180, optional=True)
+    if error:
+        return jsonify({"success": False, "message": error}), 400
+    if (destination_lat is None) != (destination_lng is None):
+        return jsonify({"success": False, "message": "Drop a complete delivery pin on the map."}), 400
 
     if not items:
         return jsonify({"success": False, "message": "Your cart is empty."}), 400
@@ -784,11 +871,13 @@ def create_order():
             try:
                 cur = conn.execute("""
                     INSERT INTO orders (order_number, customer_id, total, payment_status, order_status, order_date,
-                                        payment_method, payment_reference, shipping_address, contact_phone)
-                    VALUES (?, ?, ?, ?, 'Pending', datetime('now'), ?, ?, ?, ?)
+                                        payment_method, payment_reference, shipping_address, contact_phone,
+                                        destination_lat, destination_lng)
+                    VALUES (?, ?, ?, ?, 'Pending', datetime('now'), ?, ?, ?, ?, ?, ?)
                 """, (order_number, customer["id"], total,
                       "Pay on Delivery" if payment_method == "COD" else "Awaiting Verification",
-                      payment_method, payment_reference or "N/A", shipping_address, contact_phone))
+                      payment_method, payment_reference or "N/A", shipping_address, contact_phone,
+                      destination_lat, destination_lng))
                 order_id = cur.lastrowid
                 break
             except sqlite3.IntegrityError:
@@ -806,11 +895,18 @@ def create_order():
                             status = CASE WHEN stock - ? <= 0 THEN 'Out of Stock' ELSE status END
                             WHERE id = ?""", (qty, qty, p["id"]))
 
-        exists = conn.execute("SELECT id FROM customer_addresses WHERE customer_id = ? AND address = ?",
+        exists = conn.execute("SELECT id, latitude FROM customer_addresses WHERE customer_id = ? AND address = ?",
                               (customer["id"], shipping_address)).fetchone()
         if not exists:
-            conn.execute("INSERT INTO customer_addresses (customer_id, address) VALUES (?, ?)", (customer["id"], shipping_address))
+            conn.execute("""
+                INSERT INTO customer_addresses (customer_id, address, latitude, longitude)
+                VALUES (?, ?, ?, ?)
+            """, (customer["id"], shipping_address, destination_lat, destination_lng))
             sync_primary_address(conn, customer["id"])
+        elif destination_lat is not None and destination_lng is not None and row_value(exists, "latitude") is None:
+            conn.execute("""
+                UPDATE customer_addresses SET latitude = ?, longitude = ? WHERE id = ?
+            """, (destination_lat, destination_lng, exists["id"]))
         if not (customer["phone"] or "").strip():
             conn.execute("UPDATE customers SET phone = ? WHERE id = ?", (contact_phone, customer["id"]))
 
@@ -906,12 +1002,151 @@ def update_order_status(oid):
     conn.close()
     return jsonify({"message": "Order status updated.", "order_status": new_status})
 
+@app.route("/api/orders/<int:oid>/location", methods=["POST"])
+@admin_required
+def share_order_location(oid):
+    data = request.get_json(silent=True) or {}
+    latitude, error = _location_number(data.get("latitude"), "Latitude", -90, 90)
+    if error:
+        return jsonify({"error": error}), 400
+    longitude, error = _location_number(data.get("longitude"), "Longitude", -180, 180)
+    if error:
+        return jsonify({"error": error}), 400
+    accuracy, error = _location_number(data.get("accuracy"), "Accuracy", 0, optional=True)
+    if error:
+        return jsonify({"error": error}), 400
+    heading, error = _location_number(data.get("heading"), "Heading", 0, 360, optional=True)
+    if error:
+        return jsonify({"error": error}), 400
+    speed, error = _location_number(data.get("speed"), "Speed", 0, optional=True)
+    if error:
+        return jsonify({"error": error}), 400
+
+    conn = get_db()
+    order = conn.execute("SELECT order_status FROM orders WHERE id = ?", (oid,)).fetchone()
+    if not order:
+        conn.close()
+        return jsonify({"error": "Order not found."}), 404
+    if order["order_status"] in ("Delivered", "Cancelled", "Refunded"):
+        conn.close()
+        return jsonify({"error": "Live location is unavailable for this order."}), 409
+
+    cur = conn.execute("""
+        INSERT INTO order_location_pings
+            (order_id, shared_by, latitude, longitude, accuracy, heading, speed, recorded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    """, (oid, session["user_id"], latitude, longitude, accuracy, heading, speed))
+    conn.execute("""
+        DELETE FROM order_location_pings
+        WHERE order_id = ? AND id NOT IN (
+            SELECT id FROM order_location_pings WHERE order_id = ? ORDER BY id DESC LIMIT 200
+        )
+    """, (oid, oid))
+    conn.commit()
+    ping = conn.execute("""
+        SELECT id, latitude, longitude, accuracy, heading, speed, recorded_at
+        FROM order_location_pings WHERE id = ?
+    """, (cur.lastrowid,)).fetchone()
+    conn.close()
+    return jsonify({"message": "Location updated.", "location": dict(ping)}), 201
+
+@app.route("/api/orders/<int:oid>/location", methods=["GET"])
+@admin_required
+def get_order_location(oid):
+    conn = get_db()
+    order = conn.execute("""
+        SELECT id, order_number, order_status FROM orders WHERE id = ?
+    """, (oid,)).fetchone()
+    if not order:
+        conn.close()
+        return jsonify({"error": "Order not found."}), 404
+    rows = conn.execute("""
+        SELECT id, latitude, longitude, accuracy, heading, speed, recorded_at
+        FROM order_location_pings WHERE order_id = ? ORDER BY id DESC LIMIT 100
+    """, (oid,)).fetchall()
+    conn.close()
+    history = [dict(r) for r in reversed(rows)]
+    return jsonify({
+        "order_id": oid,
+        "order_number": order["order_number"],
+        "order_status": order["order_status"],
+        "latest": history[-1] if history else None,
+        "history": history,
+        "store": STORE_LOCATION,
+    })
+
+def _route_payload(order):
+    payload = {
+        "store": STORE_LOCATION,
+        "destination": None,
+        "route": [],
+        "distance_m": None,
+        "duration_s": None,
+        "source": "none",
+    }
+    destination_lat = order["destination_lat"]
+    destination_lng = order["destination_lng"]
+    if destination_lat is None or destination_lng is None:
+        return payload
+
+    payload["destination"] = {
+        "latitude": destination_lat,
+        "longitude": destination_lng,
+        "address": order["shipping_address"],
+    }
+
+    fallback = [
+        [STORE_LOCATION["latitude"], STORE_LOCATION["longitude"]],
+        [destination_lat, destination_lng],
+    ]
+    url = (
+        "https://router.project-osrm.org/route/v1/driving/"
+        f"{STORE_LOCATION['longitude']},{STORE_LOCATION['latitude']};"
+        f"{destination_lng},{destination_lat}?overview=full&geometries=geojson"
+    )
+    try:
+        req = Request(url, headers={"User-Agent": "AthaliahCollections/1.0"})
+        with urlopen(req, timeout=6) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        routes = data.get("routes") or []
+        if not routes:
+            raise ValueError("No route returned")
+        coordinates = routes[0].get("geometry", {}).get("coordinates") or []
+        points = [[float(lng_lat[1]), float(lng_lat[0])] for lng_lat in coordinates]
+        payload.update({
+            "route": points or fallback,
+            "distance_m": routes[0].get("distance"),
+            "duration_s": routes[0].get("duration"),
+            "source": "osrm",
+        })
+    except Exception:
+        payload.update({"route": fallback, "source": "direct"})
+    return payload
+
+@app.route("/api/orders/<int:oid>/route", methods=["GET"])
+@admin_required
+def get_order_route(oid):
+    conn = get_db()
+    order = conn.execute("""
+        SELECT order_number, shipping_address, destination_lat, destination_lng
+        FROM orders WHERE id = ?
+    """, (oid,)).fetchone()
+    conn.close()
+    if not order:
+        return jsonify({"error": "Order not found."}), 404
+    data = _route_payload(order)
+    data["order_id"] = oid
+    data["order_number"] = order["order_number"]
+    return jsonify(data)
+
 # ---------- STOREFRONT: MY ORDERS ----------
 def _orders_for_customer(conn, customer_id):
     orders = conn.execute("""
-        SELECT id, order_number, order_date, total, order_status, payment_method, payment_status,
-               shipping_address, contact_phone, tracking_number
-        FROM orders WHERE customer_id = ? ORDER BY id DESC
+        SELECT o.id, o.order_number, o.order_date, o.total, o.order_status, o.payment_method, o.payment_status,
+               o.shipping_address, o.contact_phone, o.tracking_number, o.destination_lat, o.destination_lng,
+               (SELECT recorded_at FROM order_location_pings p
+                WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1) AS live_location_at
+        FROM orders o WHERE o.customer_id = ? ORDER BY o.id DESC
     """, (customer_id,)).fetchall()
     result = []
     for o in orders:
@@ -955,6 +1190,60 @@ def cancel_store_order(oid):
     conn.commit()
     conn.close()
     return jsonify({"message": "Order cancelled."})
+
+@app.route("/api/store/orders/<int:oid>/location", methods=["GET"])
+@customer_required
+def store_order_location(oid):
+    conn = get_db()
+    customer = get_customer_for_user(conn, session["user_id"], create=False)
+    order = conn.execute("""
+        SELECT id, order_number, order_status, shipping_address, destination_lat, destination_lng
+        FROM orders WHERE id = ? AND customer_id = ?
+    """, (oid, customer["id"] if customer else -1)).fetchone()
+    if not order:
+        conn.close()
+        return jsonify({"error": "Order not found."}), 404
+    if order["order_status"] != "Shipped":
+        conn.close()
+        return jsonify({"error": "Live tracking is available while your order is shipped."}), 409
+
+    rows = conn.execute("""
+        SELECT latitude, longitude, recorded_at
+        FROM order_location_pings WHERE order_id = ? ORDER BY id DESC LIMIT 50
+    """, (oid,)).fetchall()
+    conn.close()
+    history = [dict(r) for r in reversed(rows)]
+    return jsonify({
+        "order_id": oid,
+        "order_number": order["order_number"],
+        "latest": history[-1] if history else None,
+        "history": history,
+        "store": STORE_LOCATION,
+        "destination": {
+            "latitude": order["destination_lat"],
+            "longitude": order["destination_lng"],
+            "address": order["shipping_address"],
+        },
+    })
+
+@app.route("/api/store/orders/<int:oid>/route", methods=["GET"])
+@customer_required
+def store_order_route(oid):
+    conn = get_db()
+    customer = get_customer_for_user(conn, session["user_id"], create=False)
+    order = conn.execute("""
+        SELECT order_number, order_status, shipping_address, destination_lat, destination_lng
+        FROM orders WHERE id = ? AND customer_id = ?
+    """, (oid, customer["id"] if customer else -1)).fetchone()
+    conn.close()
+    if not order:
+        return jsonify({"error": "Order not found."}), 404
+    if order["order_status"] != "Shipped":
+        return jsonify({"error": "Route is available while your order is shipped."}), 409
+    data = _route_payload(order)
+    data["order_id"] = oid
+    data["order_number"] = order["order_number"]
+    return jsonify(data)
 
 # ---------- STOREFRONT: NOTIFICATIONS ----------
 @app.route("/api/store/notifications", methods=["GET"])
@@ -1005,7 +1294,7 @@ def store_notifications():
 def _profile_payload(conn, user_id):
     user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     cust = get_customer_for_user(conn, user_id)
-    addresses = conn.execute("SELECT id, address FROM customer_addresses WHERE customer_id = ? ORDER BY id",
+    addresses = conn.execute("SELECT id, address, latitude, longitude FROM customer_addresses WHERE customer_id = ? ORDER BY id",
                              (cust["id"],)).fetchall()
     first_name = cust["first_name"] or (cust["full_name"] or "").split(" ")[0] or user["username"]
     return {
@@ -1051,12 +1340,28 @@ def add_address():
     address = (data.get("address") or "").strip()
     if len(address) < 5:
         return jsonify({"error": "Please enter a complete address."}), 400
+    latitude, error = _location_number(data.get("latitude"), "Latitude", -90, 90, optional=True)
+    if error:
+        return jsonify({"error": error}), 400
+    longitude, error = _location_number(data.get("longitude"), "Longitude", -180, 180, optional=True)
+    if error:
+        return jsonify({"error": error}), 400
+    if (latitude is None) != (longitude is None):
+        return jsonify({"error": "Drop a complete pin on the map."}), 400
     conn = get_db()
     cust = get_customer_for_user(conn, session["user_id"])
-    if not conn.execute("SELECT id FROM customer_addresses WHERE customer_id = ? AND address = ?",
-                        (cust["id"], address)).fetchone():
-        conn.execute("INSERT INTO customer_addresses (customer_id, address) VALUES (?, ?)", (cust["id"], address))
+    existing = conn.execute("SELECT id, latitude FROM customer_addresses WHERE customer_id = ? AND address = ?",
+                            (cust["id"], address)).fetchone()
+    if not existing:
+        conn.execute("""
+            INSERT INTO customer_addresses (customer_id, address, latitude, longitude)
+            VALUES (?, ?, ?, ?)
+        """, (cust["id"], address, latitude, longitude))
         sync_primary_address(conn, cust["id"])
+    elif latitude is not None and longitude is not None and row_value(existing, "latitude") is None:
+        conn.execute("""
+            UPDATE customer_addresses SET latitude = ?, longitude = ? WHERE id = ?
+        """, (latitude, longitude, existing["id"]))
     conn.commit()
     payload = _profile_payload(conn, session["user_id"])
     conn.close()

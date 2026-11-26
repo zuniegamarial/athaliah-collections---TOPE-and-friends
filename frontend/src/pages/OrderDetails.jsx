@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -13,12 +13,24 @@ import {
   MapPin,
   CreditCard,
   Package,
+  Navigation,
+  Play,
+  Square,
+  RefreshCw,
 } from 'lucide-react'
 import { api } from '../api'
 import Notification from '../components/Notification'
+import OrderLocationMap from '../components/OrderLocationMap'
 import { OrderStatusBadge } from '../components/StatusBadge'
 
 const STATUSES = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Refunded']
+const LOCATION_INTERVAL_MS = 10000
+
+const formatLocationTime = (value) => {
+  if (!value) return '—'
+  const date = new Date(value.replace(' ', 'T') + 'Z')
+  return isNaN(date) ? value : date.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
+}
 
 export default function OrderDetails() {
   const { id } = useParams()
@@ -27,6 +39,14 @@ export default function OrderDetails() {
   const [tracking, setTracking] = useState('')
   const [notice, setNotice] = useState(null)
   const [labelInfo, setLabelInfo] = useState(null)
+  const [location, setLocation] = useState(null)
+  const [route, setRoute] = useState(null)
+  const [sharing, setSharing] = useState(false)
+  const [locationError, setLocationError] = useState('')
+  const watchRef = useRef(null)
+  const intervalRef = useRef(null)
+  const lastPositionRef = useRef(null)
+  const lastSentRef = useRef(0)
 
   const accent = 'var(--app-accent, #a18b69)'
 
@@ -59,7 +79,102 @@ export default function OrderDetails() {
       })
       .catch(() => setNotice({ type: 'error', message: 'Order not found.' }))
 
-  useEffect(() => { load() }, [id])
+  const loadLocation = () =>
+    api.orderLocation(id)
+      .then(setLocation)
+      .catch(() => setLocation(null))
+
+  const loadRoute = () =>
+    api.orderRoute(id)
+      .then(setRoute)
+      .catch(() => setRoute(null))
+
+  const handleGeoError = (err) => {
+    setLocationError(err?.message || 'Location access was denied.')
+  }
+
+  const sendLocation = (position) => {
+    if (!position?.coords) return Promise.resolve(false)
+    const now = Date.now()
+    if (now - lastSentRef.current < LOCATION_INTERVAL_MS - 1000) return Promise.resolve(true)
+    lastSentRef.current = now
+
+    const { latitude, longitude, accuracy, heading, speed } = position.coords
+    return api.shareOrderLocation(id, { latitude, longitude, accuracy, heading, speed })
+      .then(res => {
+        setLocation(prev => ({
+          ...(prev || {}),
+          latest: res.location,
+          history: [...(prev?.history || []).filter(p => p.id !== res.location.id), res.location].slice(-100),
+        }))
+        return true
+      })
+      .catch(err => {
+        setLocationError(err.data?.error || err.message || 'Could not share location.')
+        return false
+      })
+  }
+
+  const startSharing = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by this browser.')
+      return
+    }
+    setLocationError('')
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        lastPositionRef.current = position
+        sendLocation(position).then(ok => {
+          if (!ok) return
+          watchRef.current = navigator.geolocation.watchPosition(
+            next => {
+              lastPositionRef.current = next
+              sendLocation(next)
+            },
+            handleGeoError,
+            { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+          )
+          intervalRef.current = setInterval(() => {
+            if (lastPositionRef.current) {
+              sendLocation(lastPositionRef.current)
+            } else {
+              navigator.geolocation.getCurrentPosition(
+                next => {
+                  lastPositionRef.current = next
+                  sendLocation(next)
+                },
+                handleGeoError,
+                { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+              )
+            }
+          }, LOCATION_INTERVAL_MS)
+          setSharing(true)
+        })
+      },
+      handleGeoError,
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+    )
+  }
+
+  const stopSharing = () => {
+    if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current)
+    if (intervalRef.current != null) clearInterval(intervalRef.current)
+    watchRef.current = null
+    intervalRef.current = null
+    lastPositionRef.current = null
+    setSharing(false)
+    loadLocation()
+  }
+
+  useEffect(() => {
+    load()
+    loadLocation()
+    loadRoute()
+    return () => {
+      if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current)
+      if (intervalRef.current != null) clearInterval(intervalRef.current)
+    }
+  }, [id])
 
   if (!order) {
     return (
@@ -300,6 +415,105 @@ export default function OrderDetails() {
           </div>
         </section>
       </div>
+
+      <section
+        aria-labelledby="live-location-heading"
+        className="space-y-4 rounded-lg border p-5"
+        style={panelStyle}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-4" style={dividerStyle}>
+          <div className="flex min-w-0 items-center gap-2">
+            <Navigation size={19} style={{ color: accent }} />
+            <h2 id="live-location-heading" className="font-semibold">Live Delivery Location</h2>
+          </div>
+        </div>
+
+        {['Delivered', 'Cancelled', 'Refunded'].includes(order.order_status) ? (
+          <p className="text-sm text-[#8B7663]">Live tracking is closed for this order.</p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="break-words text-sm font-medium">Share this device's GPS location</p>
+                <p className="mt-1 break-words text-xs text-[#8B7663]">
+                  Customers can see the courier location while the order is Shipped. Updates are sent every 10 seconds.
+                </p>
+              </div>
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                <button
+                  onClick={() => { loadLocation(); loadRoute() }}
+                  className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 py-2.5 text-xs font-medium transition hover:opacity-70 active:opacity-60 sm:min-h-[44px] sm:flex-none sm:text-sm"
+                  style={actionButtonStyle}
+                >
+                  <RefreshCw size={15} /> Refresh
+                </button>
+                {sharing ? (
+                  <button
+                    onClick={stopSharing}
+                    className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-red-300 px-3 py-2.5 text-xs font-medium text-red-700 transition hover:bg-red-50 active:opacity-70 sm:min-h-[44px] sm:flex-none sm:text-sm"
+                  >
+                    <Square size={15} /> Stop sharing
+                  </button>
+                ) : (
+                  <button
+                    onClick={startSharing}
+                    className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-xs font-medium text-white transition hover:opacity-85 active:opacity-70 sm:min-h-[44px] sm:flex-none sm:text-sm"
+                    style={{ backgroundColor: accent }}
+                  >
+                    <Play size={15} /> Start sharing
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {order.order_status !== 'Shipped' && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Set the order status to Shipped so the customer can view the tracker.
+              </p>
+            )}
+
+            {locationError && (
+              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{locationError}</p>
+            )}
+
+            {location?.latest || route?.destination || order.destination_lat != null ? (
+              <>
+                <div className="grid grid-cols-1 gap-1 text-xs text-[#8B7663]">
+                  <span className="flex min-w-0 flex-wrap gap-1">
+                    Store: <strong className="min-w-0 break-words font-medium text-[#292725]">{route?.store?.address || '—'}</strong>
+                  </span>
+                  <span className="flex min-w-0 flex-wrap gap-1">
+                    Customer: <strong className="min-w-0 break-words font-medium text-[#292725]">{route?.destination?.address || order.shipping_address || order.customer_address || '—'}</strong>
+                  </span>
+                  {location?.latest && (
+                    <span className="flex min-w-0 flex-wrap gap-1">
+                      Rider update: <strong className="min-w-0 break-words font-medium text-[#292725]">{formatLocationTime(location.latest.recorded_at)}</strong>
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#8B7663]">
+                  <span>Store → Customer route</span>
+                  <span>Rider trail is dashed</span>
+                  <span>Auto-send: 10 seconds</span>
+                </div>
+                <OrderLocationMap
+                  history={location?.history || []}
+                  route={route?.route || []}
+                  origin={route?.store || location?.store}
+                  destination={route?.destination || (order.destination_lat != null ? {
+                    latitude: order.destination_lat,
+                    longitude: order.destination_lng,
+                    address: order.shipping_address || order.customer_address,
+                  } : null)}
+                  className="h-[260px] w-full sm:h-[320px] lg:h-[380px] rounded-lg overflow-hidden border border-slate-700"
+                />
+              </>
+            ) : (
+              <p className="text-xs text-[#8B7663]">No pins or location have been shared for this order yet.</p>
+            )}
+          </>
+        )}
+      </section>
 
       {/* Order Actions */}
       <section

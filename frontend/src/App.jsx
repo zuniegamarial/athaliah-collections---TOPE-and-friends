@@ -14,6 +14,7 @@ import StoreCart from './pages/StoreCart'
 import StoreCheckout from './pages/StoreCheckout'
 import StoreSearch from './pages/StoreSearch'
 import StoreOrders from './pages/StoreOrders'
+import StoreOrderTracking from './pages/StoreOrderTracking'
 import StoreProfile from './pages/StoreProfile'
 import StoreNotifications from './pages/StoreNotifications'
 
@@ -414,6 +415,7 @@ export default function App() {
           <Route path="/store/checkout" element={<StoreCheckout />} />
           <Route path="/store/search" element={<StoreSearch />} />
           <Route path="/store/orders" element={<StoreOrders />} />
+          <Route path="/store/orders/:id/track" element={<StoreOrderTracking />} />
           <Route path="/store/profile" element={<StoreProfile />} />
           <Route path="/store/notifications" element={<StoreNotifications />} />
         </Route>
